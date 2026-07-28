@@ -35,10 +35,22 @@ same standup onto Monday, Tuesday, and Wednesday from one card. The copies are
 ordinary tasks: move, resize, complete, or delete them without touching the
 template.
 
-Editing a template changes what *future* copies look like — copies already on
-the grid keep the text they were created with. Templates have no done checkbox,
-since finishing a template is meaningless. Un-ticking the box on a scheduled
-card promotes it to a template and takes it off the grid.
+**Edits propagate.** Each copy remembers its template via `templateId`, so
+editing the template updates every copy already on the grid — the editor tells
+you how many will change before you save.
+
+Only the fields you actually changed are pushed down. Rename the template and
+the copies get the new name but keep their own lengths, so a copy you resized
+on the grid survives. Change **Length** on the template and every copy adopts
+it, overriding those manual resizes. Times are never touched: a copy stays on
+the day and hour you dropped it.
+
+Templates have no done checkbox, since finishing a template is meaningless.
+Ticking the box on a scheduled card promotes it to a template and takes it off
+the grid; deleting a template leaves its copies alone.
+
+One limitation: copies made before this linking existed have no `templateId`
+and won't receive edits. Re-drag the template to make fresh linked copies.
 
 ### Keyboard
 
@@ -121,6 +133,7 @@ Tasks are stored under `planner.v2` as:
   id, title, notes, priority,   // 'low' | 'normal' | 'high'
   durationMin,                  // block length in minutes
   regular,                      // true = template; duplicates when scheduled
+  templateId,                   // the template this was copied from, or null
   start,                        // ISO datetime, or null when unscheduled
                                 // (always null for a regular card)
   leadMin,                      // reminder lead time; -1 disables

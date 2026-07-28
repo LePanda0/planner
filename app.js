@@ -56,6 +56,8 @@
       leadMin: Number.isFinite(t.leadMin) ? t.leadMin : 15,
       durationMin: clamp(Number(t.durationMin) || 60, MIN_DUR, DAY_MIN),
       regular: !!t.regular,
+      // Which template this card was copied from, so edits can follow it.
+      templateId: t.regular ? null : (t.templateId || null),
       // A template is never itself on the grid — only its copies are.
       start: t.regular ? null : (t.start || null),
       done: !!t.done,
@@ -168,6 +170,7 @@
       ...t,
       id: crypto.randomUUID(),
       regular: false,
+      templateId: t.id,
       done: false,
       notified: false,
       created: new Date().toISOString(),
@@ -200,21 +203,51 @@
     const t = byId(id);
     if (!t) return;
 
-    const leadChanged = 'leadMin' in fields && fields.leadMin !== t.leadMin;
+    const before = { ...t };
     Object.assign(t, fields);
 
-    // Promoting a scheduled card to a template takes it off the grid.
-    if (t.regular) t.start = null;
+    // Promoting a scheduled card to a template takes it off the grid, and it
+    // stops being anyone's copy.
+    if (t.regular) { t.start = null; t.templateId = null; }
 
-    // Never let a block run past midnight after a length change.
-    const startMin = t.start ? minutesInto(t.start) : 0;
-    t.durationMin = clamp(t.durationMin, MIN_DUR, DAY_MIN - startMin);
+    clampToMidnight(t);
 
     // A new lead time deserves a fresh chance to fire.
-    if (leadChanged) t.notified = false;
+    if (t.leadMin !== before.leadMin) t.notified = false;
+
+    if (t.regular) propagate(t, before);
 
     save();
     renderAll();
+  }
+
+  function clampToMidnight(t) {
+    const startMin = t.start ? minutesInto(t.start) : 0;
+    t.durationMin = clamp(t.durationMin, MIN_DUR, DAY_MIN - startMin);
+  }
+
+  const copiesOf = id => state.tasks.filter(t => t.templateId === id);
+
+  /**
+   * Push a template's edits down to its scheduled copies — but only the fields
+   * that actually changed, so editing a title doesn't undo a copy you resized.
+   */
+  function propagate(template, before) {
+    const changed = {};
+    for (const key of ['title', 'notes', 'priority', 'leadMin', 'durationMin']) {
+      if (template[key] !== before[key]) changed[key] = template[key];
+    }
+    if (!Object.keys(changed).length) return;
+
+    const copies = copiesOf(template.id);
+    for (const c of copies) {
+      Object.assign(c, changed);
+      clampToMidnight(c);
+      if ('leadMin' in changed) c.notified = false;
+    }
+    if (copies.length) {
+      toast(`Updated ${copies.length} scheduled cop${copies.length === 1 ? 'y' : 'ies'}.`);
+    }
   }
 
   function toggleDone(id) {
@@ -437,8 +470,11 @@
 
     const when = $('#e-when');
     if (t.regular) {
+      const n = copiesOf(t.id).length;
       when.hidden = false;
-      when.textContent = 'Regular event — dragging it onto the grid leaves the original in the tray.';
+      when.textContent = n
+        ? `Regular event — your changes will also update ${n} scheduled cop${n === 1 ? 'y' : 'ies'}.`
+        : 'Regular event — dragging it onto the grid leaves the original in the tray.';
     } else if (t.start) {
       const s = minutesInto(t.start);
       when.hidden = false;
