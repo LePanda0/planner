@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Planner</title>
+<meta name="description" content="A local-first planner with due dates and browser reminders.">
+<meta name="theme-color" content="#4f46e5">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+    <h1>Planner</h1>
+  </div>
+  <div class="topbar-actions">
+    <button id="notify-btn" class="btn ghost" type="button">Enable reminders</button>
+    <button id="theme-btn" class="btn icon" type="button" title="Toggle theme" aria-label="Toggle theme">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <form id="new-task" class="card compose" autocomplete="off">
+    <input id="f-title" class="title-input" type="text" placeholder="What needs doing?" required maxlength="200" aria-label="Task title">
+    <div class="compose-row">
+      <label class="field">
+        <span>Due</span>
+        <input id="f-due" type="datetime-local" aria-label="Due date and time">
+      </label>
+      <label class="field">
+        <span>Remind</span>
+        <select id="f-lead" aria-label="Reminder lead time">
+          <option value="0">At due time</option>
+          <option value="5">5 min before</option>
+          <option value="15" selected>15 min before</option>
+          <option value="60">1 hour before</option>
+          <option value="1440">1 day before</option>
+          <option value="-1">No reminder</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Priority</span>
+        <select id="f-priority" aria-label="Priority">
+          <option value="low">Low</option>
+          <option value="normal" selected>Normal</option>
+          <option value="high">High</option>
+        </select>
+      </label>
+      <button class="btn primary" type="submit">Add task</button>
+    </div>
+    <textarea id="f-notes" class="notes-input" rows="1" placeholder="Notes (optional)" maxlength="2000" aria-label="Notes"></textarea>
+  </form>
+
+  <nav class="tabs" id="tabs" role="tablist">
+    <button class="tab is-active" data-view="today" role="tab">Today <span class="count" data-count="today">0</span></button>
+    <button class="tab" data-view="upcoming" role="tab">Upcoming <span class="count" data-count="upcoming">0</span></button>
+    <button class="tab" data-view="someday" role="tab">Someday <span class="count" data-count="someday">0</span></button>
+    <button class="tab" data-view="done" role="tab">Done <span class="count" data-count="done">0</span></button>
+  </nav>
+
+  <section id="list" class="list" aria-live="polite"></section>
+
+  <p id="empty" class="empty" hidden></p>
+</main>
+
+<footer class="footer">
+  <span id="storage-note">Saved locally in this browser.</span>
+  <span class="spacer"></span>
+  <button id="export-btn" class="btn ghost sm" type="button">Export</button>
+  <button id="import-btn" class="btn ghost sm" type="button">Import</button>
+  <button id="clear-done" class="btn ghost sm" type="button">Clear done</button>
+  <input id="import-file" type="file" accept="application/json" hidden>
+</footer>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="./app.js"></script>
+</body>
+</html>
