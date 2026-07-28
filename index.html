@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Planner</title>
-<meta name="description" content="A local-first planner with due dates and browser reminders.">
+<meta name="description" content="Drag task cards onto a 24-hour day schedule. Local-first, with browser reminders.">
 <meta name="theme-color" content="#4f46e5">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
@@ -18,60 +18,104 @@
     <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
     <h1>Planner</h1>
   </div>
+
+  <div class="daynav">
+    <button id="prev-day" class="btn icon" type="button" aria-label="Previous day">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <button id="today-btn" class="btn sm" type="button">Today</button>
+    <button id="next-day" class="btn icon" type="button" aria-label="Next day">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+    </button>
+    <h2 id="day-label" class="day-label">—</h2>
+  </div>
+
   <div class="topbar-actions">
-    <button id="notify-btn" class="btn ghost" type="button">Enable reminders</button>
+    <button id="notify-btn" class="btn ghost sm" type="button">Enable reminders</button>
     <button id="theme-btn" class="btn icon" type="button" title="Toggle theme" aria-label="Toggle theme">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
     </button>
   </div>
 </header>
 
-<main>
-  <form id="new-task" class="card compose" autocomplete="off">
-    <input id="f-title" class="title-input" type="text" placeholder="What needs doing?" required maxlength="200" aria-label="Task title">
-    <div class="compose-row">
-      <label class="field">
-        <span>Due</span>
-        <input id="f-due" type="datetime-local" aria-label="Due date and time">
-      </label>
-      <label class="field">
-        <span>Remind</span>
-        <select id="f-lead" aria-label="Reminder lead time">
-          <option value="0">At due time</option>
-          <option value="5">5 min before</option>
-          <option value="15" selected>15 min before</option>
-          <option value="60">1 hour before</option>
-          <option value="1440">1 day before</option>
-          <option value="-1">No reminder</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>Priority</span>
-        <select id="f-priority" aria-label="Priority">
-          <option value="low">Low</option>
-          <option value="normal" selected>Normal</option>
-          <option value="high">High</option>
-        </select>
-      </label>
-      <button class="btn primary" type="submit">Add task</button>
+<main class="layout">
+
+  <!-- ------------------------------ card tray ------------------------------ -->
+  <aside class="tray" id="tray">
+    <div class="tray-head">
+      <h2>Unscheduled <span class="count" id="tray-count">0</span></h2>
+      <button id="add-btn" class="btn primary sm" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="plus"><path d="M12 5v14M5 12h14"/></svg>
+        New card
+      </button>
     </div>
-    <textarea id="f-notes" class="notes-input" rows="1" placeholder="Notes (optional)" maxlength="2000" aria-label="Notes"></textarea>
-  </form>
 
-  <nav class="tabs" id="tabs" role="tablist">
-    <button class="tab is-active" data-view="today" role="tab">Today <span class="count" data-count="today">0</span></button>
-    <button class="tab" data-view="upcoming" role="tab">Upcoming <span class="count" data-count="upcoming">0</span></button>
-    <button class="tab" data-view="someday" role="tab">Someday <span class="count" data-count="someday">0</span></button>
-    <button class="tab" data-view="done" role="tab">Done <span class="count" data-count="done">0</span></button>
-  </nav>
+    <form id="compose" class="compose" hidden autocomplete="off">
+      <input id="f-title" class="title-input" type="text" placeholder="What needs doing?" required maxlength="200" aria-label="Task title">
+      <textarea id="f-notes" class="notes-input" rows="1" placeholder="Notes (optional)" maxlength="2000" aria-label="Notes"></textarea>
+      <div class="compose-row">
+        <label class="field">
+          <span>Length</span>
+          <select id="f-duration" aria-label="Duration">
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="60" selected>1 hour</option>
+            <option value="90">1.5 hours</option>
+            <option value="120">2 hours</option>
+            <option value="180">3 hours</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Priority</span>
+          <select id="f-priority" aria-label="Priority">
+            <option value="low">Low</option>
+            <option value="normal" selected>Normal</option>
+            <option value="high">High</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Remind</span>
+          <select id="f-lead" aria-label="Reminder lead time">
+            <option value="0">At start</option>
+            <option value="5">5 min before</option>
+            <option value="15" selected>15 min before</option>
+            <option value="60">1 hour before</option>
+            <option value="-1">No reminder</option>
+          </select>
+        </label>
+      </div>
+      <div class="compose-actions">
+        <button type="button" id="cancel-compose" class="btn ghost sm">Cancel</button>
+        <button type="submit" class="btn primary sm">Add card</button>
+      </div>
+    </form>
 
-  <section id="list" class="list" aria-live="polite"></section>
+    <div id="tray-list" class="tray-list"></div>
+    <p id="tray-empty" class="tray-empty" hidden>No unscheduled cards. Drag one off the calendar to park it here.</p>
 
-  <p id="empty" class="empty" hidden></p>
+    <div class="tray-foot">
+      <button id="toggle-done" class="btn ghost sm" type="button" aria-expanded="false">Show completed (0)</button>
+      <div id="done-list" class="tray-list done-list" hidden></div>
+    </div>
+  </aside>
+
+  <!-- ------------------------------- calendar ------------------------------ -->
+  <section class="calendar" aria-label="Day schedule">
+    <div class="cal-scroll" id="cal-scroll">
+      <div class="cal-inner" id="cal-inner">
+        <div class="gutter" id="gutter" aria-hidden="true"></div>
+        <div class="lanes" id="lanes">
+          <div class="now-line" id="now-line" hidden><span class="now-dot"></span></div>
+          <div class="drop-preview" id="drop-preview" hidden></div>
+        </div>
+      </div>
+    </div>
+  </section>
 </main>
 
 <footer class="footer">
-  <span id="storage-note">Saved locally in this browser.</span>
+  <span>Saved locally in this browser.</span>
+  <span class="hint">Drag a card onto the grid · drag its bottom edge to resize · drag it back to the tray to unschedule</span>
   <span class="spacer"></span>
   <button id="export-btn" class="btn ghost sm" type="button">Export</button>
   <button id="import-btn" class="btn ghost sm" type="button">Import</button>

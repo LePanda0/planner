@@ -1,25 +1,51 @@
 # Planner
 
-A local-first planning and reminder app. No accounts, no server, no tracking —
-tasks live in your browser's `localStorage` and never leave the device.
+Drag task cards from a tray onto a 24-hour day grid. Local-first: tasks live in
+your browser's `localStorage` and never leave the device. No accounts, no server,
+no tracking.
 
 **Live:** https://lepanda0.github.io/planner/
 
-## Features
+## How it works
 
-- Add tasks with a due date/time, priority, and notes
-- **Today / Upcoming / Someday / Done** views, with upcoming grouped by day
-- Browser notifications at a configurable lead time (at due, 5m, 15m, 1h, 1d before)
-- Installable as a PWA and works offline
+The left rail holds **unscheduled cards** — a backlog you build with the
+**New card** button. The right pane is a **12 AM to 12 AM day grid**, Google
+Calendar style, with hour lines, half-hour marks, and a live red now-indicator.
+
+- **Drag a card onto the grid** to schedule it. It snaps to 15 minutes and a
+  dashed preview shows the exact time range before you let go.
+- **Drag a block around the grid** to move it; duration is preserved.
+- **Drag a block's bottom edge** to change how long it takes.
+- **Drag a block back to the tray** to unschedule it without losing it.
+- **Arrows at the top** move between days; the tray is shared across all days.
+- Overlapping blocks split into side-by-side columns automatically.
+
+Dragging uses pointer events, so it works with a mouse, a trackpad, and touch.
+
+### Keyboard
+
+Cards and blocks are focusable, so the app is usable without dragging:
+
+| Key | On a tray card | On a scheduled block |
+| --- | --- | --- |
+| `Enter` | Schedule in the first free slot | Send back to the tray |
+| `↑` / `↓` | — | Move by 15 min (`Shift` = 1 hour) |
+| `Delete` | Delete the task | Delete the task |
+
+## Other features
+
+- Priority (colored left edge), notes, and per-task duration
+- Browser notifications at a configurable lead time before a block starts
+- Installable as a PWA, works offline
 - Light and dark themes, following the system by default
-- Export/import your tasks as JSON
+- Export/import all tasks as JSON
 
 ## How reminders actually work
 
-The app schedules nothing on a server — it checks every 20 seconds for tasks
+Nothing is scheduled on a server — the app checks every 20 seconds for blocks
 whose reminder time has passed and fires a browser `Notification`.
 
-That means reminders arrive when Planner is **open in a tab**, or running as an
+Reminders therefore arrive when Planner is **open in a tab**, or running as an
 installed PWA. If every window is closed, the reminder fires the next time you
 open the app (as long as it's less than a day late). This is the honest limit of
 static hosting.
@@ -33,13 +59,18 @@ service worker in `sw.js` is already the right place to add a `push` handler.
 ## Local development
 
 No build step, no dependencies. Serve the folder over HTTP — opening
-`index.html` via `file://` won't work, because service workers and
-notifications require a secure origin:
+`index.html` via `file://` won't work, because service workers and notifications
+require a secure origin:
 
 ```powershell
 python -m http.server 8000
 # then open http://localhost:8000
 ```
+
+The service worker caches the app shell, so **after changing CSS or JS you must
+bump `CACHE` in `sw.js`** — otherwise returning visitors keep the old build for
+one extra load. During development, DevTools → Application → Service Workers →
+"Update on reload" avoids the confusion.
 
 ## Deployment
 
@@ -50,8 +81,25 @@ Pushing to `main` publishes automatically via GitHub Pages
 
 | File | Purpose |
 | --- | --- |
-| `index.html` | Markup and app shell |
-| `styles.css` | Theming, layout, components |
-| `app.js` | State, storage, reminders, rendering |
+| `index.html` | App shell: top bar, tray, calendar |
+| `styles.css` | Theming, layout, card/block/grid styling |
+| `app.js` | State, storage, drag controller, overlap layout, reminders |
 | `sw.js` | Offline cache (stale-while-revalidate) |
 | `manifest.webmanifest` | PWA metadata |
+
+## Data model
+
+Tasks are stored under `planner.v2` as:
+
+```js
+{
+  id, title, notes, priority,   // 'low' | 'normal' | 'high'
+  durationMin,                  // block length in minutes
+  start,                        // ISO datetime, or null when unscheduled
+  leadMin,                      // reminder lead time; -1 disables
+  done, notified, created
+}
+```
+
+Data saved by the earlier `planner.v1` list version is migrated automatically:
+a `due` date becomes a one-hour block at that time.
