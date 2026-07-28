@@ -37,7 +37,8 @@
   const els = {};
   ['tray', 'tray-list', 'tray-count', 'tray-empty', 'done-list', 'toggle-done',
    'compose', 'add-btn', 'cancel-compose', 'cal-scroll', 'cal-inner', 'gutter',
-   'lanes', 'now-line', 'drop-preview', 'day-label', 'toast', 'notify-btn'
+   'lanes', 'now-line', 'drop-preview', 'day-label', 'toast', 'notify-btn',
+   'editor', 'editor-form'
   ].forEach(id => { els[id] = document.getElementById(id); });
 
   // --------------------------------------------------------------- storage
@@ -169,6 +170,24 @@
     renderAll();
   }
 
+  function updateTask(id, fields) {
+    const t = byId(id);
+    if (!t) return;
+
+    const leadChanged = 'leadMin' in fields && fields.leadMin !== t.leadMin;
+    Object.assign(t, fields);
+
+    // Never let a block run past midnight after a length change.
+    const startMin = t.start ? minutesInto(t.start) : 0;
+    t.durationMin = clamp(t.durationMin, MIN_DUR, DAY_MIN - startMin);
+
+    // A new lead time deserves a fresh chance to fire.
+    if (leadChanged) t.notified = false;
+
+    save();
+    renderAll();
+  }
+
   function toggleDone(id) {
     const t = byId(id);
     if (!t) return;
@@ -228,6 +247,9 @@
           ${t.notes ? `<div class="card-notes">${esc(t.notes)}</div>` : ''}
           <div class="card-meta">${meta.join(' · ')}</div>
         </div>
+        <button class="edit" data-act="edit" aria-label="Edit task">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16v4zM14.5 5.5l4 4"/></svg>
+        </button>
         <button class="del" data-act="delete" aria-label="Delete task">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
@@ -349,6 +371,82 @@
     toastTimer = setTimeout(() => { els.toast.hidden = true; }, 3400);
   }
 
+  // ---------------------------------------------------------------- editor
+
+  const DURATIONS = [15, 30, 45, 60, 90, 120, 180, 240];
+  let editingId = null;
+
+  function openEditor(id) {
+    const t = byId(id);
+    if (!t) return;
+    editingId = id;
+
+    // A resized block can have any length, so make sure its own value is offered.
+    const options = DURATIONS.includes(t.durationMin)
+      ? DURATIONS
+      : [...DURATIONS, t.durationMin].sort((a, b) => a - b);
+    $('#e-duration').innerHTML = options
+      .map(m => `<option value="${m}">${fmtDuration(m)}</option>`).join('');
+
+    $('#e-title').value = t.title;
+    $('#e-notes').value = t.notes;
+    $('#e-duration').value = String(t.durationMin);
+    $('#e-priority').value = t.priority;
+    $('#e-lead').value = String(t.leadMin);
+
+    const when = $('#e-when');
+    if (t.start) {
+      const s = minutesInto(t.start);
+      when.hidden = false;
+      when.textContent =
+        `Scheduled ${fmtDayLabel(new Date(t.start)).split(' · ')[0]}, ${fmtTime(s)} – ${fmtTime(s + t.durationMin)}`;
+    } else {
+      when.hidden = false;
+      when.textContent = 'Unscheduled — drag it onto the grid to give it a time.';
+    }
+
+    els.editor.showModal();
+    $('#e-title').select();
+  }
+
+  function closeEditor() {
+    editingId = null;
+    if (els.editor.open) els.editor.close();
+  }
+
+  function wireEditor() {
+    els['editor-form'].addEventListener('submit', e => {
+      e.preventDefault();
+      const title = $('#e-title').value.trim();
+      if (!title || !editingId) return;
+
+      const id = editingId;
+      updateTask(id, {
+        title,
+        notes: $('#e-notes').value.trim(),
+        durationMin: Number($('#e-duration').value),
+        priority: $('#e-priority').value,
+        leadMin: Number($('#e-lead').value),
+      });
+      closeEditor();
+      refocus(id);
+    });
+
+    $('#e-cancel').addEventListener('click', closeEditor);
+
+    $('#e-delete').addEventListener('click', () => {
+      if (!editingId) return;
+      removeTask(editingId);
+      closeEditor();
+    });
+
+    // Backdrop click closes; Esc is handled natively.
+    els.editor.addEventListener('click', e => {
+      if (e.target === els.editor) closeEditor();
+    });
+    els.editor.addEventListener('close', () => { editingId = null; });
+  }
+
   // ------------------------------------------------------------------ drag
 
   /** @type {null | {id:string, mode:'move'|'resize', ...}} */
@@ -357,7 +455,7 @@
 
   function onPointerDown(e) {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
-    if (e.target.closest('[data-act="toggle"], [data-act="delete"]')) return;
+    if (e.target.closest('[data-act="toggle"], [data-act="delete"], [data-act="edit"]')) return;
 
     const host = e.target.closest('.card, .event');
     if (!host) return;
@@ -499,8 +597,11 @@
     drag = null;
 
     if (!d || !d.started) {
-      // A plain click — nothing to commit.
-      if (d) d.host.classList.remove('is-source');
+      // Never crossed the drag threshold, so treat it as a click: open the editor.
+      if (d) {
+        d.host.classList.remove('is-source');
+        if (d.mode === 'move') openEditor(d.id);
+      }
       return;
     }
 
@@ -533,6 +634,12 @@
     if (!host) return;
     const t = byId(host.dataset.id);
     if (!t) return;
+
+    if (e.key === 'F2') {
+      e.preventDefault();
+      openEditor(t.id);
+      return;
+    }
 
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
@@ -709,10 +816,11 @@
 
     // check / delete, delegated across tray and calendar
     document.addEventListener('click', e => {
-      const btn = e.target.closest('[data-act="toggle"], [data-act="delete"]');
+      const btn = e.target.closest('[data-act="toggle"], [data-act="delete"], [data-act="edit"]');
       if (!btn) return;
       const id = btn.closest('[data-id]').dataset.id;
       if (btn.dataset.act === 'toggle') toggleDone(id);
+      else if (btn.dataset.act === 'edit') openEditor(id);
       else removeTask(id);
     });
 
@@ -765,6 +873,7 @@
   load();
   buildGutter();
   wire();
+  wireEditor();
   updateNotifyButton();
   renderAll();
   scrollToNow();

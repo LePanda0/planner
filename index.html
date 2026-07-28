@@ -115,13 +115,63 @@
 
 <footer class="footer">
   <span>Saved locally in this browser.</span>
-  <span class="hint">Drag a card onto the grid · drag its bottom edge to resize · drag it back to the tray to unschedule</span>
+  <span class="hint">Click a card to edit · drag it onto the grid · drag its bottom edge to resize · drag it back to the tray to unschedule</span>
   <span class="spacer"></span>
   <button id="export-btn" class="btn ghost sm" type="button">Export</button>
   <button id="import-btn" class="btn ghost sm" type="button">Import</button>
   <button id="clear-done" class="btn ghost sm" type="button">Clear done</button>
   <input id="import-file" type="file" accept="application/json" hidden>
 </footer>
+
+<dialog id="editor" class="editor" aria-labelledby="editor-heading">
+  <form id="editor-form" class="editor-form" autocomplete="off">
+    <h2 id="editor-heading">Edit card</h2>
+
+    <label class="field-block">
+      <span>Title</span>
+      <input id="e-title" class="title-input" type="text" required maxlength="200">
+    </label>
+
+    <label class="field-block">
+      <span>Notes</span>
+      <textarea id="e-notes" class="notes-input" rows="3" maxlength="2000"></textarea>
+    </label>
+
+    <div class="compose-row three">
+      <label class="field">
+        <span>Length</span>
+        <select id="e-duration" aria-label="Duration"></select>
+      </label>
+      <label class="field">
+        <span>Priority</span>
+        <select id="e-priority" aria-label="Priority">
+          <option value="low">Low</option>
+          <option value="normal">Normal</option>
+          <option value="high">High</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Remind</span>
+        <select id="e-lead" aria-label="Reminder lead time">
+          <option value="0">At start</option>
+          <option value="5">5 min before</option>
+          <option value="15">15 min before</option>
+          <option value="60">1 hour before</option>
+          <option value="-1">No reminder</option>
+        </select>
+      </label>
+    </div>
+
+    <p id="e-when" class="editor-when"></p>
+
+    <div class="editor-actions">
+      <button type="button" id="e-delete" class="btn danger sm">Delete</button>
+      <span class="spacer"></span>
+      <button type="button" id="e-cancel" class="btn ghost sm">Cancel</button>
+      <button type="submit" class="btn primary sm">Save</button>
+    </div>
+  </form>
+</dialog>
 
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 

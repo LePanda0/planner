@@ -12,6 +12,8 @@ The left rail holds **unscheduled cards** — a backlog you build with the
 **New card** button. The right pane is a **12 AM to 12 AM day grid**, Google
 Calendar style, with hour lines, half-hour marks, and a live red now-indicator.
 
+- **Click a card or block** (or press `F2`) to edit its title, notes, length,
+  priority, and reminder. The pencil icon on a tray card does the same.
 - **Drag a card onto the grid** to schedule it. It snaps to 15 minutes and a
   dashed preview shows the exact time range before you let go.
 - **Drag a block around the grid** to move it; duration is preserved.
@@ -28,9 +30,16 @@ Cards and blocks are focusable, so the app is usable without dragging:
 
 | Key | On a tray card | On a scheduled block |
 | --- | --- | --- |
+| `F2` | Open the editor | Open the editor |
 | `Enter` | Schedule in the first free slot | Send back to the tray |
 | `↑` / `↓` | — | Move by 15 min (`Shift` = 1 hour) |
 | `Delete` | Delete the task | Delete the task |
+
+Inside the editor, `Enter` saves and `Esc` cancels.
+
+A click only opens the editor if it *isn't* the start of a drag — the pointer
+has to stay within 4px. So dragging never accidentally opens the editor, and a
+tap never accidentally moves a card.
 
 ## Other features
 
