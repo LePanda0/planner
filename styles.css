@@ -147,6 +147,20 @@ body.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbin
 .field select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .compose-actions { display: flex; justify-content: flex-end; gap: 6px; }
 
+.check-row {
+  display: flex; align-items: start; gap: 8px; font-size: 12.5px;
+  color: var(--text-dim); cursor: pointer; line-height: 1.35;
+}
+.check-row input { flex: none; margin: 2px 0 0; accent-color: var(--accent); width: 15px; height: 15px; }
+
+/* tray sections */
+.tray-section { display: grid; gap: 7px; }
+.section-label {
+  font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-dim); margin: 4px 0 0; display: flex; align-items: center; gap: 7px;
+}
+.tray-section[hidden] { display: none; }
+
 /* tray cards */
 .tray-list { display: grid; gap: 7px; align-content: start; }
 .tray-empty { font-size: 13px; color: var(--text-dim); text-align: center; padding: 18px 8px; margin: 0; }
@@ -167,7 +181,18 @@ body.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbin
 .card-body { flex: 1; min-width: 0; }
 .card-title { font-size: 14px; font-weight: 500; word-wrap: break-word; }
 .card-notes { font-size: 12.5px; color: var(--text-dim); margin-top: 2px; white-space: pre-wrap; word-wrap: break-word; }
-.card-meta { font-size: 11.5px; color: var(--text-dim); margin-top: 3px; }
+.card-meta {
+  font-size: 11.5px; color: var(--text-dim); margin-top: 3px;
+  display: flex; align-items: center; gap: 5px;
+}
+.card-meta .repeat { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* templates read as a stack of cards rather than a single one */
+.card.is-regular { position: relative; }
+.card.is-regular::after {
+  content: ""; position: absolute; inset: 5px -4px -4px 5px; z-index: -1;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+}
 
 .done-list .card { opacity: .6; }
 .done-list .card-title { text-decoration: line-through; color: var(--text-dim); }
@@ -268,6 +293,9 @@ body.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbin
   position: absolute; left: 0; right: 0; bottom: 0; height: 8px;
   cursor: ns-resize; touch-action: none;
 }
+/* On a 15-minute block the handle would swallow most of the body and every
+   attempt to move it would resize instead, so keep it a thin strip. */
+.event.is-short .resize-handle { height: 4px; }
 .resize-handle::after {
   content: ""; position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%);
   width: 22px; height: 2px; border-radius: 2px; background: var(--border); opacity: 0;

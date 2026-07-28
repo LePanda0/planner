@@ -24,6 +24,22 @@ Calendar style, with hour lines, half-hour marks, and a live red now-indicator.
 
 Dragging uses pointer events, so it works with a mouse, a trackpad, and touch.
 
+### Regular events
+
+Tick **Regular event** when creating a card (or in its editor) and it moves to
+the tray's **Regular** section, drawn as a stack to show it's a template.
+
+A regular card is never scheduled itself. Dragging it onto the grid leaves the
+original in place and schedules an independent **copy**, so you can drop the
+same standup onto Monday, Tuesday, and Wednesday from one card. The copies are
+ordinary tasks: move, resize, complete, or delete them without touching the
+template.
+
+Editing a template changes what *future* copies look like — copies already on
+the grid keep the text they were created with. Templates have no done checkbox,
+since finishing a template is meaningless. Un-ticking the box on a scheduled
+card promotes it to a template and takes it off the grid.
+
 ### Keyboard
 
 Cards and blocks are focusable, so the app is usable without dragging:
@@ -104,7 +120,9 @@ Tasks are stored under `planner.v2` as:
 {
   id, title, notes, priority,   // 'low' | 'normal' | 'high'
   durationMin,                  // block length in minutes
+  regular,                      // true = template; duplicates when scheduled
   start,                        // ISO datetime, or null when unscheduled
+                                // (always null for a regular card)
   leadMin,                      // reminder lead time; -1 disables
   done, notified, created
 }

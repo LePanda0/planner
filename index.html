@@ -43,7 +43,7 @@
   <!-- ------------------------------ card tray ------------------------------ -->
   <aside class="tray" id="tray">
     <div class="tray-head">
-      <h2>Unscheduled <span class="count" id="tray-count">0</span></h2>
+      <h2>Cards</h2>
       <button id="add-btn" class="btn primary sm" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true" class="plus"><path d="M12 5v14M5 12h14"/></svg>
         New card
@@ -84,14 +84,27 @@
           </select>
         </label>
       </div>
+      <label class="check-row">
+        <input id="f-regular" type="checkbox">
+        <span>Regular event — keeps a copy in the tray every time you schedule it</span>
+      </label>
+
       <div class="compose-actions">
         <button type="button" id="cancel-compose" class="btn ghost sm">Cancel</button>
         <button type="submit" class="btn primary sm">Add card</button>
       </div>
     </form>
 
-    <div id="tray-list" class="tray-list"></div>
-    <p id="tray-empty" class="tray-empty" hidden>No unscheduled cards. Drag one off the calendar to park it here.</p>
+    <section class="tray-section" id="regular-section" hidden>
+      <h3 class="section-label">Regular <span class="count" id="regular-count">0</span></h3>
+      <div id="regular-list" class="tray-list"></div>
+    </section>
+
+    <section class="tray-section">
+      <h3 class="section-label">Unscheduled <span class="count" id="tray-count">0</span></h3>
+      <div id="tray-list" class="tray-list"></div>
+      <p id="tray-empty" class="tray-empty" hidden>No unscheduled cards. Drag one off the calendar to park it here.</p>
+    </section>
 
     <div class="tray-foot">
       <button id="toggle-done" class="btn ghost sm" type="button" aria-expanded="false">Show completed (0)</button>
@@ -161,6 +174,11 @@
         </select>
       </label>
     </div>
+
+    <label class="check-row">
+      <input id="e-regular" type="checkbox">
+      <span>Regular event — keeps a copy in the tray every time you schedule it</span>
+    </label>
 
     <p id="e-when" class="editor-when"></p>
 

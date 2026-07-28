@@ -38,7 +38,7 @@
   ['tray', 'tray-list', 'tray-count', 'tray-empty', 'done-list', 'toggle-done',
    'compose', 'add-btn', 'cancel-compose', 'cal-scroll', 'cal-inner', 'gutter',
    'lanes', 'now-line', 'drop-preview', 'day-label', 'toast', 'notify-btn',
-   'editor', 'editor-form'
+   'editor', 'editor-form', 'regular-section', 'regular-list', 'regular-count'
   ].forEach(id => { els[id] = document.getElementById(id); });
 
   // --------------------------------------------------------------- storage
@@ -55,7 +55,9 @@
       priority: ['low', 'normal', 'high'].includes(t.priority) ? t.priority : 'normal',
       leadMin: Number.isFinite(t.leadMin) ? t.leadMin : 15,
       durationMin: clamp(Number(t.durationMin) || 60, MIN_DUR, DAY_MIN),
-      start: t.start || null,
+      regular: !!t.regular,
+      // A template is never itself on the grid — only its copies are.
+      start: t.regular ? null : (t.start || null),
       done: !!t.done,
       notified: !!t.notified,
       created: t.created || new Date().toISOString(),
@@ -152,6 +154,30 @@
     renderAll();
   }
 
+  /**
+   * Put a card on the grid. A regular card is a template, so it stays put and
+   * a fresh copy is scheduled instead.
+   */
+  function scheduleFrom(id, day, minutes) {
+    const t = byId(id);
+    if (!t) return;
+    if (!t.regular) { schedule(id, day, minutes); return; }
+
+    const at = clamp(minutes, 0, DAY_MIN - t.durationMin);
+    state.tasks.push(normalize({
+      ...t,
+      id: crypto.randomUUID(),
+      regular: false,
+      done: false,
+      notified: false,
+      created: new Date().toISOString(),
+      start: isoAt(day, at),
+    }));
+    save();
+    renderAll();
+    toast(`Added a copy at ${fmtTime(at)}.`);
+  }
+
   function unschedule(id) {
     const t = byId(id);
     if (!t) return;
@@ -176,6 +202,9 @@
 
     const leadChanged = 'leadMin' in fields && fields.leadMin !== t.leadMin;
     Object.assign(t, fields);
+
+    // Promoting a scheduled card to a template takes it off the grid.
+    if (t.regular) t.start = null;
 
     // Never let a block run past midnight after a length change.
     const startMin = t.start ? minutesInto(t.start) : 0;
@@ -232,20 +261,26 @@
     els['day-label'].textContent = fmtDayLabel(selectedDay);
   }
 
+  const REPEAT_ICON =
+    '<svg class="repeat" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2l4 4-4 4M21 6H7a4 4 0 00-4 4v1M7 22l-4-4 4-4M3 18h14a4 4 0 004-4v-1"/></svg>';
+
   function cardHTML(t) {
     const meta = [fmtDuration(t.durationMin)];
     if (t.priority === 'high') meta.push('High priority');
+    const metaHTML = (t.regular ? REPEAT_ICON : '') + meta.join(' · ');
+
     return `
-      <article class="card prio-${t.priority}${t.done ? ' is-done' : ''}"
+      <article class="card prio-${t.priority}${t.done ? ' is-done' : ''}${t.regular ? ' is-regular' : ''}"
                data-id="${t.id}" tabindex="0"
-               aria-label="${esc(t.title)}, unscheduled">
+               aria-label="${esc(t.title)}, ${t.regular ? 'regular event' : 'unscheduled'}">
+        ${t.regular ? '' : `
         <button class="check" data-act="toggle" aria-label="Mark ${t.done ? 'not done' : 'done'}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
-        </button>
+        </button>`}
         <div class="card-body">
           <div class="card-title">${esc(t.title)}</div>
           ${t.notes ? `<div class="card-notes">${esc(t.notes)}</div>` : ''}
-          <div class="card-meta">${meta.join(' · ')}</div>
+          <div class="card-meta">${metaHTML}</div>
         </div>
         <button class="edit" data-act="edit" aria-label="Edit task">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16v4zM14.5 5.5l4 4"/></svg>
@@ -257,8 +292,13 @@
   }
 
   function renderTray() {
-    const open = state.tasks.filter(t => !t.start && !t.done);
+    const regular = state.tasks.filter(t => t.regular && !t.done);
+    const open = state.tasks.filter(t => !t.regular && !t.start && !t.done);
     const done = state.tasks.filter(t => t.done);
+
+    els['regular-section'].hidden = regular.length === 0;
+    els['regular-list'].innerHTML = regular.map(cardHTML).join('');
+    els['regular-count'].textContent = regular.length;
 
     els['tray-list'].innerHTML = open.map(cardHTML).join('');
     els['tray-count'].textContent = open.length;
@@ -393,9 +433,13 @@
     $('#e-duration').value = String(t.durationMin);
     $('#e-priority').value = t.priority;
     $('#e-lead').value = String(t.leadMin);
+    $('#e-regular').checked = t.regular;
 
     const when = $('#e-when');
-    if (t.start) {
+    if (t.regular) {
+      when.hidden = false;
+      when.textContent = 'Regular event — dragging it onto the grid leaves the original in the tray.';
+    } else if (t.start) {
       const s = minutesInto(t.start);
       when.hidden = false;
       when.textContent =
@@ -427,6 +471,7 @@
         durationMin: Number($('#e-duration').value),
         priority: $('#e-priority').value,
         leadMin: Number($('#e-lead').value),
+        regular: $('#e-regular').checked,
       });
       closeEditor();
       refocus(id);
@@ -501,7 +546,8 @@
       ghost.removeAttribute('tabindex');
       document.body.appendChild(ghost);
       drag.ghost = ghost;
-      drag.host.classList.add('is-source');
+      // A template isn't going anywhere, so don't dim it as if it were.
+      if (!drag.task.regular) drag.host.classList.add('is-source');
     }
     startAutoScroll();
   }
@@ -618,7 +664,7 @@
     }
 
     if (d.dropMin !== null) {
-      schedule(d.id, selectedDay, d.dropMin);
+      scheduleFrom(d.id, selectedDay, d.dropMin);
     } else if (pointInEl(els.tray, d.lastX, d.lastY)) {
       if (d.task.start) { unschedule(d.id); toast('Moved back to unscheduled.'); }
       else renderAll();
@@ -652,8 +698,9 @@
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         const min = firstFreeSlot(selectedDay, t.durationMin);
-        schedule(t.id, selectedDay, min);
-        toast(`Scheduled at ${fmtTime(min)}.`);
+        const wasRegular = t.regular;
+        scheduleFrom(t.id, selectedDay, min);
+        if (!wasRegular) toast(`Scheduled at ${fmtTime(min)}.`);
       }
       return;
     }
@@ -802,6 +849,7 @@
         durationMin: Number($('#f-duration').value),
         priority: $('#f-priority').value,
         leadMin: Number($('#f-lead').value),
+        regular: $('#f-regular').checked,
         start: null,
       });
       els.compose.reset();
