@@ -9,6 +9,7 @@
   const STORE_KEY = 'planner.v2';
   const LEGACY_KEY = 'planner.v1';
   const THEME_KEY = 'planner.theme';
+  const VIEW_KEY = 'planner.view';
 
   const SNAP = 15;          // minutes the grid snaps to
   const MIN_DUR = 15;
@@ -32,13 +33,16 @@
   /** @type {{tasks: Task[]}} */
   let state = { tasks: [] };
   let selectedDay = startOfDay(new Date());
+  /** @type {'day'|'week'} which span the calendar shows */
+  let view = 'day';
   let showDone = false;
 
   const els = {};
   ['tray', 'tray-list', 'tray-count', 'tray-empty', 'done-list', 'toggle-done',
    'compose', 'add-btn', 'cancel-compose', 'cal-scroll', 'cal-inner', 'gutter',
    'lanes', 'now-line', 'drop-preview', 'day-label', 'toast', 'notify-btn',
-   'editor', 'editor-form', 'regular-section', 'regular-list', 'regular-count'
+   'editor', 'editor-form', 'regular-section', 'regular-list', 'regular-count',
+   'calendar', 'week-head', 'today-col'
   ].forEach(id => { els[id] = document.getElementById(id); });
 
   // --------------------------------------------------------------- storage
@@ -106,6 +110,16 @@
 
   function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
   function isSameDay(a, b) { return startOfDay(a).getTime() === startOfDay(b).getTime(); }
+
+  // Calendar arithmetic goes through setDate rather than ±86400000 so a day
+  // that is 23 or 25 hours long (DST) still lands on the right date.
+  function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+  function startOfWeek(d) { const x = startOfDay(d); return addDays(x, -x.getDay()); }
+  function weekDays(d) { const s = startOfWeek(d); return Array.from({ length: 7 }, (_, i) => addDays(s, i)); }
+
+  /** The days the calendar is currently showing, left to right. */
+  function viewDays() { return view === 'week' ? weekDays(selectedDay) : [selectedDay]; }
+
   function minutesInto(iso) { const d = new Date(iso); return d.getHours() * 60 + d.getMinutes(); }
 
   function isoAt(day, minutes) {
@@ -134,6 +148,21 @@
     if (diff === 0) return `${base} · Today`;
     if (diff === 1) return `${base} · Tomorrow`;
     if (diff === -1) return `${base} · Yesterday`;
+    return base;
+  }
+
+  function fmtWeekLabel(day) {
+    const days = weekDays(day);
+    const [first] = days;
+    const last = days[6];
+    const sameMonth = first.getMonth() === last.getMonth();
+    const base = first.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' – ' +
+      last.toLocaleDateString([], sameMonth ? { day: 'numeric' } : { month: 'short', day: 'numeric' });
+
+    const diff = Math.round((startOfWeek(day) - startOfWeek(new Date())) / (7 * 86400000));
+    if (diff === 0) return `${base} · This week`;
+    if (diff === 1) return `${base} · Next week`;
+    if (diff === -1) return `${base} · Last week`;
     return base;
   }
 
@@ -285,13 +314,38 @@
 
   function renderAll() {
     renderDayLabel();
+    renderWeekHead();
     renderTray();
     renderCalendar();
     updateNow();
   }
 
   function renderDayLabel() {
-    els['day-label'].textContent = fmtDayLabel(selectedDay);
+    els['day-label'].textContent =
+      view === 'week' ? fmtWeekLabel(selectedDay) : fmtDayLabel(selectedDay);
+  }
+
+  /** Column headers above the grid — week view only. */
+  function renderWeekHead() {
+    const head = els['week-head'];
+    head.hidden = view !== 'week';
+    if (view !== 'week') { head.innerHTML = ''; return; }
+
+    // The header is outside the scroller, so it has to reserve the scrollbar's
+    // width itself or every column sits a few pixels left of its lane.
+    head.style.paddingRight = `${els['cal-scroll'].offsetWidth - els['cal-scroll'].clientWidth}px`;
+
+    const today = new Date();
+    head.innerHTML = weekDays(selectedDay).map(d => {
+      const cls = 'daycol-head' +
+        (isSameDay(d, today) ? ' is-today' : '') +
+        (isSameDay(d, selectedDay) ? ' is-selected' : '');
+      return `<button class="${cls}" type="button" data-day="${d.toISOString()}"
+                aria-label="Show ${fmtDayLabel(d).split(' · ')[0]}">
+                <span class="dow">${d.toLocaleDateString([], { weekday: 'short' })}</span>
+                <span class="dom">${d.getDate()}</span>
+              </button>`;
+    }).join('');
   }
 
   const REPEAT_ICON =
@@ -395,21 +449,46 @@
   function renderCalendar() {
     els.lanes.querySelectorAll('.event').forEach(n => n.remove());
 
-    for (const item of assignColumns(eventsOn(selectedDay))) {
+    const days = viewDays();
+    const band = 100 / days.length;      // width of one day column, in percent
+    const gap = days.length > 1 ? 2 : 4; // px of breathing room around a block
+    els.lanes.classList.toggle('is-week', view === 'week');
+    els.lanes.style.setProperty('--cols', days.length);
+
+    // Tint whichever column is today, so the week reads at a glance.
+    const todayIdx = days.findIndex(d => isSameDay(d, new Date()));
+    els['today-col'].hidden = view !== 'week' || todayIdx === -1;
+    if (!els['today-col'].hidden) {
+      els['today-col'].style.left = `${todayIdx * band}%`;
+      els['today-col'].style.width = `${band}%`;
+    }
+
+    const laneW = els.lanes.clientWidth;
+    days.forEach((day, dayIdx) => renderDayColumn(day, dayIdx, band, gap, laneW));
+  }
+
+  function renderDayColumn(day, dayIdx, band, gap, laneW) {
+    for (const item of assignColumns(eventsOn(day))) {
       const { task: t, s, col, cols } = item;
       const height = Math.max(t.durationMin * PX_PER_MIN, 16);
-      const widthPct = 100 / cols;
+      const widthPct = band / cols;
+
+      // Three overlapping blocks in a week column leave ~50px each — not enough
+      // for a checkbox and a time range, so those step aside for the title.
+      const narrow = laneW * (widthPct / 100) - gap * 2 < 96;
 
       const el = document.createElement('article');
-      el.className = `event prio-${t.priority}${t.done ? ' is-done' : ''}${height < 34 ? ' is-short' : ''}`;
+      el.className = `event prio-${t.priority}${t.done ? ' is-done' : ''}` +
+        `${height < 34 ? ' is-short' : ''}${narrow ? ' is-narrow' : ''}`;
       el.dataset.id = t.id;
       el.tabIndex = 0;
       el.style.top = `${s * PX_PER_MIN}px`;
       el.style.height = `${height}px`;
-      el.style.left = `calc(${col * widthPct}% + 4px)`;
-      el.style.width = `calc(${widthPct}% - 8px)`;
+      el.style.left = `calc(${dayIdx * band + col * widthPct}% + ${gap}px)`;
+      el.style.width = `calc(${widthPct}% - ${gap * 2}px)`;
       el.setAttribute('aria-label',
-        `${t.title}, ${fmtTime(s)} to ${fmtTime(s + t.durationMin)}`);
+        `${t.title}, ${fmtTime(s)} to ${fmtTime(s + t.durationMin)}` +
+        (view === 'week' ? `, ${day.toLocaleDateString([], { weekday: 'long' })}` : ''));
 
       el.innerHTML = `
         <button class="check" data-act="toggle" aria-label="Mark ${t.done ? 'not done' : 'done'}">
@@ -430,9 +509,16 @@
 
   function updateNow() {
     const line = els['now-line'];
-    if (!isSameDay(selectedDay, new Date())) { line.hidden = true; return; }
     const now = new Date();
+    const days = viewDays();
+    const idx = days.findIndex(d => isSameDay(d, now));
+    if (idx === -1) { line.hidden = true; return; }
+
+    // Confine the line to today's column so it doesn't imply a time on Friday.
+    const band = 100 / days.length;
     line.hidden = false;
+    line.style.left = `${idx * band}%`;
+    line.style.right = `${100 - (idx + 1) * band}%`;
     line.style.top = `${(now.getHours() * 60 + now.getMinutes()) * PX_PER_MIN}px`;
   }
 
@@ -559,6 +645,7 @@
       lastX: e.clientX, lastY: e.clientY,
       ghost: null,
       dropMin: null,
+      dropDay: null,
       newDuration: t.durationMin,
     };
 
@@ -607,7 +694,10 @@
       `translate(${drag.lastX - drag.grabDX}px, ${drag.lastY - drag.grabDY}px) rotate(1deg)`;
 
     const min = minutesFromPoint(drag.lastX, drag.lastY, drag.task.durationMin);
+    const days = viewDays();
+    const dayIdx = min === null ? -1 : dayIndexFromPoint(drag.lastX, days.length);
     drag.dropMin = min;
+    drag.dropDay = dayIdx === -1 ? null : days[dayIdx];
 
     const overTray = pointInEl(els.tray, drag.lastX, drag.lastY);
     els.tray.classList.toggle('is-drop-target', min === null && overTray);
@@ -615,10 +705,19 @@
 
     const preview = els['drop-preview'];
     if (min === null) { preview.hidden = true; return; }
+    const band = 100 / days.length;
     preview.hidden = false;
+    preview.style.left = `calc(${dayIdx * band}% + 4px)`;
+    preview.style.right = `calc(${100 - (dayIdx + 1) * band}% + 8px)`;
     preview.style.top = `${min * PX_PER_MIN}px`;
     preview.style.height = `${Math.max(drag.task.durationMin * PX_PER_MIN, 16)}px`;
     preview.innerHTML = `<span class="drop-time">${fmtTime(min)} – ${fmtTime(min + drag.task.durationMin)}</span>`;
+  }
+
+  /** Which day column a horizontal position falls in. */
+  function dayIndexFromPoint(x, count) {
+    const r = els.lanes.getBoundingClientRect();
+    return clamp(Math.floor((x - r.left) / (r.width / count)), 0, count - 1);
   }
 
   function updateResize() {
@@ -700,7 +799,7 @@
     }
 
     if (d.dropMin !== null) {
-      scheduleFrom(d.id, selectedDay, d.dropMin);
+      scheduleFrom(d.id, d.dropDay || selectedDay, d.dropMin);
     } else if (pointInEl(els.tray, d.lastX, d.lastY)) {
       if (d.task.start) { unschedule(d.id); toast('Moved back to unscheduled.'); }
       else renderAll();
@@ -748,7 +847,8 @@
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
       const delta = e.key === 'ArrowUp' ? -stepMin : stepMin;
-      schedule(t.id, selectedDay, clamp(startMin + delta, 0, DAY_MIN - t.durationMin));
+      // Nudge within the block's own day — in week view that is not selectedDay.
+      schedule(t.id, new Date(t.start), clamp(startMin + delta, 0, DAY_MIN - t.durationMin));
       refocus(t.id);
     } else if (e.key === 'Enter') {
       e.preventDefault();
@@ -858,13 +958,45 @@
     renderAll();
   }
 
+  function setView(next) {
+    if (next === view) return;
+    view = next;
+    try { localStorage.setItem(VIEW_KEY, next); } catch { /* private mode */ }
+    updateViewControls();
+    renderAll();
+    scrollToNow();
+  }
+
+  function updateViewControls() {
+    for (const [id, mode] of [['#view-day', 'day'], ['#view-week', 'week']]) {
+      const btn = $(id);
+      btn.classList.toggle('is-active', view === mode);
+      btn.setAttribute('aria-pressed', String(view === mode));
+    }
+    const unit = view === 'week' ? 'week' : 'day';
+    $('#prev-day').setAttribute('aria-label', `Previous ${unit}`);
+    $('#next-day').setAttribute('aria-label', `Next ${unit}`);
+    els.calendar.setAttribute('aria-label', view === 'week' ? 'Week schedule' : 'Day schedule');
+  }
+
   function wire() {
-    // day navigation
-    $('#prev-day').addEventListener('click', () =>
-      goToDay(new Date(selectedDay.getTime() - 86400000)));
-    $('#next-day').addEventListener('click', () =>
-      goToDay(new Date(selectedDay.getTime() + 86400000)));
+    // day / week navigation — the arrows step by whatever the view shows
+    const step = () => (view === 'week' ? 7 : 1);
+    $('#prev-day').addEventListener('click', () => goToDay(addDays(selectedDay, -step())));
+    $('#next-day').addEventListener('click', () => goToDay(addDays(selectedDay, step())));
     $('#today-btn').addEventListener('click', () => { goToDay(new Date()); scrollToNow(); });
+
+    // view switch
+    $('#view-day').addEventListener('click', () => setView('day'));
+    $('#view-week').addEventListener('click', () => setView('week'));
+
+    // clicking a week column header opens that day on its own
+    els['week-head'].addEventListener('click', e => {
+      const head = e.target.closest('[data-day]');
+      if (!head) return;
+      goToDay(new Date(head.dataset.day));
+      setView('day');
+    });
 
     // compose
     els['add-btn'].addEventListener('click', () => {
@@ -941,11 +1073,14 @@
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) { renderAll(); checkReminders(); }
     });
+
+    // a resize changes the scrollbar allowance the week header compensates for
+    window.addEventListener('resize', renderWeekHead);
   }
 
   function scrollToNow() {
     const now = new Date();
-    const target = isSameDay(selectedDay, now)
+    const target = viewDays().some(d => isSameDay(d, now))
       ? (now.getHours() * 60 + now.getMinutes()) * PX_PER_MIN - 160
       : 8 * HOUR_H;
     els['cal-scroll'].scrollTop = Math.max(0, target);
@@ -954,10 +1089,12 @@
   // ------------------------------------------------------------------ init
 
   applyTheme(localStorage.getItem(THEME_KEY));
+  if (localStorage.getItem(VIEW_KEY) === 'week') view = 'week';
   load();
   buildGutter();
   wire();
   wireEditor();
+  updateViewControls();
   updateNotifyButton();
   renderAll();
   scrollToNow();

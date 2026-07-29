@@ -22,6 +22,21 @@ Calendar style, with hour lines, half-hour marks, and a live red now-indicator.
 - **Arrows at the top** move between days; the tray is shared across all days.
 - Overlapping blocks split into side-by-side columns automatically.
 
+### Day and week views
+
+The **Day / Week** switch in the top bar changes how much the grid shows, and
+the choice is remembered between visits.
+
+- **Week** lays out Sunday through Saturday side by side, tinting today's column
+  and keeping the red now-indicator inside it.
+- **Drag a card into any column** to schedule it on that day — the dashed
+  preview follows the column you're over, so you can move a block from Tuesday
+  to Friday in one drag.
+- The arrows step a **week** at a time in week view, a day at a time in day view.
+- **Click a column's date** to open that day on its own.
+- Blocks too narrow to fit a time range (three-way overlaps, small screens) drop
+  their controls and keep the title.
+
 Dragging uses pointer events, so it works with a mouse, a trackpad, and touch.
 
 ### Regular events

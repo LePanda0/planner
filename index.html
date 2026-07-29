@@ -31,6 +31,10 @@
   </div>
 
   <div class="topbar-actions">
+    <div class="viewswitch" role="group" aria-label="Calendar view">
+      <button id="view-day" class="seg" type="button" aria-pressed="true">Day</button>
+      <button id="view-week" class="seg" type="button" aria-pressed="false">Week</button>
+    </div>
     <button id="notify-btn" class="btn ghost sm" type="button">Enable reminders</button>
     <button id="theme-btn" class="btn icon" type="button" title="Toggle theme" aria-label="Toggle theme">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
@@ -113,11 +117,13 @@
   </aside>
 
   <!-- ------------------------------- calendar ------------------------------ -->
-  <section class="calendar" aria-label="Day schedule">
+  <section class="calendar" id="calendar" aria-label="Day schedule">
+    <div class="week-head" id="week-head" hidden></div>
     <div class="cal-scroll" id="cal-scroll">
       <div class="cal-inner" id="cal-inner">
         <div class="gutter" id="gutter" aria-hidden="true"></div>
         <div class="lanes" id="lanes">
+          <div class="today-col" id="today-col" hidden></div>
           <div class="now-line" id="now-line" hidden><span class="now-dot"></span></div>
           <div class="drop-preview" id="drop-preview" hidden></div>
         </div>

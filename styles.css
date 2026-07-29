@@ -99,6 +99,19 @@ body.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbin
 .btn .plus { width: 14px; height: 14px; stroke-width: 2.4; }
 .btn[hidden] { display: none; }
 
+/* ----------------------------- view switch ------------------------------ */
+.viewswitch {
+  display: inline-flex; padding: 2px; gap: 2px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px;
+}
+.seg {
+  font: inherit; font-size: 13px; border: none; background: transparent; color: var(--text-dim);
+  padding: 4px 12px; border-radius: 7px; cursor: pointer; transition: background .15s, color .15s;
+}
+.seg:hover { color: var(--text); }
+.seg:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.seg.is-active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
+
 /* -------------------------------- layout -------------------------------- */
 .layout {
   flex: 1; min-height: 0;
@@ -225,6 +238,32 @@ body.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbin
 .cal-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
 .cal-inner { position: relative; }
 
+/* week column headers — sit above the scroller, aligned to the lanes */
+.week-head {
+  flex: none; display: grid; grid-template-columns: repeat(7, 1fr);
+  margin-left: var(--gutter-w); border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.week-head[hidden] { display: none; }
+.daycol-head {
+  font: inherit; background: transparent; border: none; cursor: pointer;
+  display: grid; justify-items: center; gap: 1px; padding: 6px 2px;
+  color: var(--text-dim); border-left: 1px solid var(--line);
+  transition: background .15s;
+}
+.daycol-head:first-child { border-left: none; }
+.daycol-head:hover { background: var(--surface-2); }
+.daycol-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.daycol-head .dow { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+.daycol-head .dom {
+  font-size: 16px; font-weight: 550; color: var(--text); line-height: 1.1;
+  width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%;
+  font-variant-numeric: tabular-nums;
+}
+.daycol-head.is-today .dom { background: var(--accent); color: var(--accent-text); }
+.daycol-head.is-today .dow { color: var(--accent); }
+.daycol-head.is-selected:not(.is-today) .dom { box-shadow: inset 0 0 0 1.5px var(--accent); }
+
 .gutter {
   position: absolute; top: 0; left: 0; width: var(--gutter-w); height: 100%;
   border-right: 1px solid var(--border);
@@ -248,6 +287,18 @@ body.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbin
     transparent calc(var(--hour-h) / 2 + 1px) var(--hour-h));
 }
 .lanes.is-drop-target { background-color: color-mix(in srgb, var(--accent) 5%, transparent); }
+
+/* week view: the same hour rules, plus a divider between day columns */
+.lanes.is-week {
+  background-image:
+    repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px calc(100% / var(--cols, 7))),
+    repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px var(--hour-h));
+}
+.today-col {
+  position: absolute; top: 0; bottom: 0; z-index: 0; pointer-events: none;
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+.today-col[hidden] { display: none; }
 
 /* now indicator */
 .now-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--now); z-index: 4; pointer-events: none; }
@@ -288,6 +339,11 @@ body.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbin
 .event .check svg { width: 9px; height: 9px; }
 .event.is-short { padding-top: 1px; align-items: center; }
 .event.is-short .event-time { display: none; }
+
+/* too thin for anything but the title */
+.event.is-narrow { padding: 2px 3px 2px 5px; }
+.event.is-narrow .check, .event.is-narrow .del, .event.is-narrow .event-time { display: none; }
+.event.is-narrow .event-title { font-size: 11.5px; }
 
 .resize-handle {
   position: absolute; left: 0; right: 0; bottom: 0; height: 8px;
@@ -364,6 +420,12 @@ body.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbin
 .toast[hidden] { display: none; }
 
 /* ------------------------------ responsive ------------------------------ */
+/* A week column is ~1/7th as wide, so the block's time no longer fits. */
+@media (max-width: 1000px) {
+  .lanes.is-week .event-time { display: none; }
+  .lanes.is-week .event { padding-left: 5px; padding-right: 4px; }
+}
+
 @media (max-width: 820px) {
   body { overflow: auto; }
   .layout { grid-template-columns: 1fr; }
@@ -371,6 +433,8 @@ body.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbin
   .topbar { flex-wrap: wrap; gap: 10px; }
   .topbar-actions { margin-left: 0; }
   .hint { display: none; }
+  .lanes.is-week .event .check, .lanes.is-week .event .del { display: none; }
+  .daycol-head .dom { font-size: 14px; width: 22px; height: 22px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
