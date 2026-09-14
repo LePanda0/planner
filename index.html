@@ -130,6 +130,41 @@
       </div>
     </div>
   </section>
+
+  <!-- --------------------------- timer + focus ---------------------------- -->
+  <aside class="side" id="side">
+    <section class="side-section">
+      <h2 class="section-label">Timer</h2>
+
+      <div class="timer-clock" id="timer-clock" role="timer">25:00</div>
+      <p class="timer-state" id="timer-state">25-minute session</p>
+
+      <div class="timer-presets" role="group" aria-label="Session length">
+        <button class="seg preset" type="button" data-min="5">5</button>
+        <button class="seg preset" type="button" data-min="10">10</button>
+        <button class="seg preset" type="button" data-min="25">25</button>
+        <button class="seg preset" type="button" data-min="50">50</button>
+        <button class="seg preset" type="button" id="preset-custom" aria-expanded="false">Custom</button>
+      </div>
+
+      <form class="timer-custom" id="timer-custom" hidden autocomplete="off">
+        <input id="custom-min" type="number" min="1" max="600" step="1" inputmode="numeric"
+               placeholder="Minutes" aria-label="Custom session length in minutes">
+        <button class="btn sm" type="submit">Set</button>
+      </form>
+
+      <div class="timer-actions">
+        <button id="timer-toggle" class="btn primary sm" type="button">Start</button>
+        <button id="timer-reset" class="btn ghost sm" type="button">Reset</button>
+      </div>
+    </section>
+
+    <section class="side-section focus">
+      <h2 class="section-label">Focus <span class="focus-when" id="focus-when">today</span></h2>
+      <div class="focus-total" id="focus-total">0m</div>
+      <p class="focus-sub" id="focus-sub">No sessions yet.</p>
+    </section>
+  </aside>
 </main>
 
 <footer class="footer">

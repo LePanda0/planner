@@ -11,6 +11,8 @@
   const THEME_KEY = 'planner.theme';
   const VIEW_KEY = 'planner.view';
   const BREAK_KEY = 'planner.break';  // the last break mark already announced
+  const TIMER_KEY = 'planner.timer';
+  const FOCUS_KEY = 'planner.focus';
 
   const SNAP = 15;          // minutes the grid snaps to
   const MIN_DUR = 15;
@@ -24,6 +26,10 @@
   const BREAK_EVERY_MIN = 30;    // break reminders land on :00 and :30
   const BREAK_MIN = 5;           // how long a break is suggested to be
   const BREAK_GRACE_MS = 5 * 60000;
+
+  const DEFAULT_TIMER_MIN = 25;
+  const MAX_TIMER_MIN = 600;
+  const FOCUS_KEEP_DAYS = 60;   // how much focus history to carry forward
 
   const HOUR_H = parseFloat(
     getComputedStyle(document.documentElement).getPropertyValue('--hour-h')
@@ -46,12 +52,23 @@
   /** @type {ServiceWorkerRegistration|null} set once the SW registers */
   let swReg = null;
 
+  /**
+   * `endsAt` is the only thing that says the clock is running; everything else
+   * is derived, so a reload picks the session back up where it really is.
+   * `creditedTo` is how far its time has already been added to the day's total.
+   */
+  let timer = { totalSec: DEFAULT_TIMER_MIN * 60, remainingSec: DEFAULT_TIMER_MIN * 60, endsAt: null, creditedTo: null };
+  /** @type {Record<string, {sec: number, done: number}>} focus logged per day */
+  let focus = {};
+
   const els = {};
   ['tray', 'tray-list', 'tray-count', 'tray-empty', 'done-list', 'toggle-done',
    'compose', 'add-btn', 'cancel-compose', 'cal-scroll', 'cal-inner', 'gutter',
    'lanes', 'now-line', 'drop-preview', 'day-label', 'toast', 'notify-btn',
    'editor', 'editor-form', 'regular-section', 'regular-list', 'regular-count',
-   'calendar', 'week-head', 'today-col'
+   'calendar', 'week-head', 'today-col',
+   'timer-clock', 'timer-state', 'timer-custom', 'custom-min', 'timer-toggle',
+   'timer-reset', 'preset-custom', 'focus-when', 'focus-total', 'focus-sub'
   ].forEach(id => { els[id] = document.getElementById(id); });
 
   // --------------------------------------------------------------- storage
@@ -131,6 +148,13 @@
   function viewDays() { return view === 'week' ? weekDays(selectedDay) : [selectedDay]; }
 
   function minutesInto(iso) { const d = new Date(iso); return d.getHours() * 60 + d.getMinutes(); }
+
+  /** Local YYYY-MM-DD — the key a day's focus total is filed under. */
+  function dayKey(d) {
+    const x = startOfDay(d);
+    const p2 = n => String(n).padStart(2, '0');
+    return `${x.getFullYear()}-${p2(x.getMonth() + 1)}-${p2(x.getDate())}`;
+  }
 
   function isoAt(day, minutes) {
     const d = new Date(day);
@@ -330,6 +354,7 @@
     renderTray();
     renderCalendar();
     updateNow();
+    renderFocus();
   }
 
   function renderDayLabel() {
@@ -1005,6 +1030,213 @@
     btn.textContent = Notification.permission === 'denied' ? 'Notifications blocked' : 'Enable notifications';
   }
 
+  // ----------------------------------------------------------------- timer
+
+  function loadTimer() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(TIMER_KEY) || 'null');
+      if (saved && Number.isFinite(saved.totalSec)) {
+        timer = {
+          totalSec: clamp(saved.totalSec, 60, MAX_TIMER_MIN * 60),
+          remainingSec: clamp(saved.remainingSec ?? saved.totalSec, 0, MAX_TIMER_MIN * 60),
+          endsAt: Number.isFinite(saved.endsAt) ? saved.endsAt : null,
+          creditedTo: Number.isFinite(saved.creditedTo) ? saved.creditedTo : null,
+        };
+      }
+      const hist = JSON.parse(localStorage.getItem(FOCUS_KEY) || '{}');
+      if (hist && typeof hist === 'object') focus = hist;
+    } catch (err) {
+      console.warn('Could not read the timer:', err);
+    }
+
+    // Keep the store from growing without bound. Write the pruning straight
+    // back, or it survives on disk until the next time the timer is touched.
+    const cutoff = dayKey(addDays(new Date(), -FOCUS_KEEP_DAYS));
+    let dropped = false;
+    for (const k of Object.keys(focus)) {
+      if (k < cutoff || !Number.isFinite(focus[k]?.sec)) { delete focus[k]; dropped = true; }
+    }
+    if (dropped) saveTimer();
+  }
+
+  function saveTimer() {
+    try {
+      localStorage.setItem(TIMER_KEY, JSON.stringify(timer));
+      localStorage.setItem(FOCUS_KEY, JSON.stringify(focus));
+    } catch { /* private mode, or full */ }
+  }
+
+  function focusOn(day) {
+    return focus[dayKey(day)] || { sec: 0, done: 0 };
+  }
+
+  /** Add elapsed milliseconds to the day they were spent on. */
+  function creditFocus(ms, at) {
+    if (!(ms > 0)) return;
+    const k = dayKey(at);
+    const entry = focus[k] || (focus[k] = { sec: 0, done: 0 });
+    entry.sec += ms / 1000;
+  }
+
+  const timerRunning = () => timer.endsAt !== null;
+
+  /**
+   * Bring the session up to the present. Time that passed while the tab was
+   * closed still counts — the clock was running — but never past the end.
+   */
+  function tickTimer() {
+    if (!timerRunning()) return;
+    const now = Date.now();
+    const upto = Math.min(now, timer.endsAt);
+
+    if (timer.creditedTo !== null) creditFocus(upto - timer.creditedTo, new Date(upto));
+    timer.creditedTo = upto;
+    timer.remainingSec = Math.max(0, Math.ceil((timer.endsAt - now) / 1000));
+
+    if (now >= timer.endsAt) finishTimer();
+    else saveTimer();
+    renderTimer();
+  }
+
+  function finishTimer() {
+    const mins = Math.round(timer.totalSec / 60);
+    timer.endsAt = null;
+    timer.creditedTo = null;
+    timer.remainingSec = timer.totalSec;
+
+    const k = dayKey(new Date());
+    const entry = focus[k] || (focus[k] = { sec: 0, done: 0 });
+    entry.done += 1;
+
+    saveTimer();
+    notify('Focus session done', {
+      body: `${mins} minute${mins === 1 ? '' : 's'} logged — take a ${BREAK_MIN}-minute break.`,
+      tag: 'timer',
+      requireInteraction: true,
+    });
+    toast(`Nice — ${mins} minute${mins === 1 ? '' : 's'} logged.`);
+  }
+
+  function startTimer() {
+    if (timerRunning()) return;
+    if (timer.remainingSec <= 0) timer.remainingSec = timer.totalSec;
+    const now = Date.now();
+    timer.endsAt = now + timer.remainingSec * 1000;
+    timer.creditedTo = now;
+    saveTimer();
+    renderTimer();
+  }
+
+  function pauseTimer() {
+    if (!timerRunning()) return;
+    tickTimer();                 // bank the time before the clock stops
+    if (!timerRunning()) return; // it ran out on the way in
+    timer.remainingSec = Math.max(0, Math.ceil((timer.endsAt - Date.now()) / 1000));
+    timer.endsAt = null;
+    timer.creditedTo = null;
+    saveTimer();
+    renderTimer();
+  }
+
+  function resetTimer() {
+    pauseTimer();
+    timer.remainingSec = timer.totalSec;
+    saveTimer();
+    renderTimer();
+  }
+
+  /** Pick a session length. Time already banked stays banked. */
+  function setTimerMinutes(min) {
+    const mins = clamp(Math.round(min), 1, MAX_TIMER_MIN);
+    pauseTimer();
+    timer.totalSec = mins * 60;
+    timer.remainingSec = timer.totalSec;
+    saveTimer();
+    renderTimer();
+  }
+
+  function fmtClock(sec) {
+    const m = Math.floor(sec / 60);
+    return `${m}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+  }
+
+  function renderTimer() {
+    const running = timerRunning();
+    const part = timer.remainingSec < timer.totalSec;
+    const mins = Math.round(timer.totalSec / 60);
+
+    els['timer-clock'].textContent = fmtClock(timer.remainingSec);
+    els['timer-clock'].classList.toggle('is-running', running);
+    els['timer-clock'].classList.toggle('is-paused', !running && part);
+
+    const endMin = running ? minutesInto(new Date(timer.endsAt).toISOString()) : 0;
+    els['timer-state'].textContent = running ? `Running until ${fmtTime(endMin)}`
+      : part ? `Paused — ${mins}-minute session`
+      : `${mins}-minute session`;
+
+    els['timer-toggle'].textContent = running ? 'Pause' : part ? 'Resume' : 'Start';
+    els['timer-reset'].disabled = !running && !part;
+
+    for (const btn of document.querySelectorAll('.preset[data-min]')) {
+      btn.classList.toggle('is-active', Number(btn.dataset.min) === mins);
+    }
+    els['preset-custom'].classList.toggle('is-active', ![5, 10, 25, 50].includes(mins));
+
+    renderFocus();
+  }
+
+  /**
+   * The timer always logs to the real today, so that is what the counter shows
+   * — unless you are reading another day on the calendar, where that day's own
+   * total is the honest answer.
+   */
+  function renderFocus() {
+    const day = view === 'week' ? new Date() : selectedDay;
+    const isToday = isSameDay(day, new Date());
+    const entry = focusOn(day);
+    const mins = Math.floor(entry.sec / 60);
+
+    els['focus-when'].textContent = isToday ? 'today'
+      : day.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    els['focus-total'].textContent = mins ? fmtDuration(mins) : '0m';
+    els['focus-sub'].textContent = entry.done
+      ? `${entry.done} session${entry.done === 1 ? '' : 's'} finished`
+      : mins ? 'No full session yet.'
+      : isToday ? 'No focus logged yet.' : 'Nothing logged.';
+  }
+
+  function wireTimer() {
+    for (const btn of document.querySelectorAll('.preset[data-min]')) {
+      btn.addEventListener('click', () => {
+        els['timer-custom'].hidden = true;
+        els['preset-custom'].setAttribute('aria-expanded', 'false');
+        setTimerMinutes(Number(btn.dataset.min));
+      });
+    }
+
+    els['preset-custom'].addEventListener('click', () => {
+      const show = els['timer-custom'].hidden;
+      els['timer-custom'].hidden = !show;
+      els['preset-custom'].setAttribute('aria-expanded', String(show));
+      if (show) {
+        els['custom-min'].value = Math.round(timer.totalSec / 60);
+        els['custom-min'].select();
+      }
+    });
+
+    els['timer-custom'].addEventListener('submit', e => {
+      e.preventDefault();
+      const mins = Number(els['custom-min'].value);
+      if (!Number.isFinite(mins) || mins < 1) { toast('Enter a length of 1 minute or more.'); return; }
+      setTimerMinutes(mins);
+      els['timer-custom'].hidden = true;
+      els['preset-custom'].setAttribute('aria-expanded', 'false');
+    });
+
+    els['timer-toggle'].addEventListener('click', () => (timerRunning() ? pauseTimer() : startTimer()));
+    els['timer-reset'].addEventListener('click', resetTimer);
+  }
+
   // ----------------------------------------------------------- theme & I/O
 
   function applyTheme(mode) {
@@ -1188,23 +1420,28 @@
   applyTheme(localStorage.getItem(THEME_KEY));
   if (localStorage.getItem(VIEW_KEY) === 'week') view = 'week';
   load();
+  loadTimer();
   buildGutter();
   wire();
   wireEditor();
+  wireTimer();
   updateViewControls();
   updateNotifyButton();
   renderAll();
+  renderTimer();
+  tickTimer();
   scrollToNow();
   checkReminders();
   checkBreaks();
 
   setInterval(() => { checkReminders(); checkBreaks(); }, TICK_MS);
+  setInterval(tickTimer, 1000);
   setInterval(updateNow, 30000);
 
   // Background tabs get their timers throttled, so catch up the moment the tab
   // (or the OS) hands focus back rather than waiting for the next tick.
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { checkReminders(); checkBreaks(); updateNow(); }
+    if (!document.hidden) { checkReminders(); checkBreaks(); tickTimer(); updateNow(); }
   });
 
   if ('serviceWorker' in navigator) {

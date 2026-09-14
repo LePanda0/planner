@@ -84,9 +84,25 @@ A click only opens the editor if it *isn't* the start of a drag — the pointer
 has to stay within 4px. So dragging never accidentally opens the editor, and a
 tap never accidentally moves a card.
 
+## Timer and focus counter
+
+A right-hand panel holds a session timer with 5 / 10 / 25 / 50-minute presets
+and a custom length (1-600 minutes). Below it, a counter shows how much focus
+time the day has collected and how many sessions were finished.
+
+- `endsAt` is the only thing that says the clock is running; everything else is
+  derived, so a reload resumes the session where it really is. Time that passed
+  while the tab was closed still counts, capped at the session's end.
+- Paused time never counts. Choosing a new length banks whatever has run.
+- The counter follows the calendar: on today it is live, on another day it
+  shows that day's stored total. Totals live in `planner.focus`, keyed by local
+  date and pruned past 60 days.
+- Finishing a session raises a notification and logs a completed session.
+
 ## Other features
 
 - Priority (colored left edge), notes, and per-task duration
+- A focus timer with presets and a per-day focus counter
 - A block shows its note under the time, or beside the title when it is
   too short (under ~55 min) for a second line
 - A notification when a block starts, plus an optional heads-up beforehand
@@ -158,7 +174,7 @@ Pushing to `main` publishes automatically via GitHub Pages
 | --- | --- |
 | `index.html` | App shell: top bar, tray, calendar |
 | `styles.css` | Theming, layout, card/block/grid styling |
-| `app.js` | State, storage, drag controller, overlap layout, notifications |
+| `app.js` | State, storage, drag controller, overlap layout, notifications, timer |
 | `sw.js` | Offline cache (stale-while-revalidate) |
 | `manifest.webmanifest` | PWA metadata |
 
