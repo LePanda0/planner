@@ -10,6 +10,7 @@
   const LEGACY_KEY = 'planner.v1';
   const THEME_KEY = 'planner.theme';
   const VIEW_KEY = 'planner.view';
+  const BREAK_KEY = 'planner.break';  // the last break mark already announced
 
   const SNAP = 15;          // minutes the grid snaps to
   const MIN_DUR = 15;
@@ -19,6 +20,10 @@
   const TICK_MS = 20000;
   // How late a block may be before its "starting now" alert is just noise.
   const START_GRACE_MS = 10 * 60000;
+
+  const BREAK_EVERY_MIN = 30;    // break reminders land on :00 and :30
+  const BREAK_MIN = 5;           // how long a break is suggested to be
+  const BREAK_GRACE_MS = 5 * 60000;
 
   const HOUR_H = parseFloat(
     getComputedStyle(document.documentElement).getPropertyValue('--hour-h')
@@ -937,6 +942,49 @@
     if (changed) { save(); renderAll(); }
   }
 
+  /** Every unfinished block covering `ms`, ignoring cards set to stay silent. */
+  function runningAt(ms) {
+    return state.tasks.filter(t => {
+      if (t.done || !t.start || t.leadMin < 0) return false;
+      const s = new Date(t.start).getTime();
+      return s <= ms && ms < s + t.durationMin * 60000;
+    });
+  }
+
+  /**
+   * While a block is running, nudge for a short break on every half hour of the
+   * clock — 5:00, 5:30, 6:00 — rather than counting from the block's own start,
+   * so back-to-back blocks keep one steady rhythm.
+   */
+  function checkBreaks() {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    const now = Date.now();
+    const at = new Date(now);
+    at.setMinutes(at.getMinutes() - (at.getMinutes() % BREAK_EVERY_MIN), 0, 0);
+    const mark = at.getTime();
+
+    // A reminder to pause is worthless once the moment is well past, and the
+    // stored mark keeps a reload from announcing the same one twice.
+    if (now - mark > BREAK_GRACE_MS) return;
+    let last = 0;
+    try { last = Number(localStorage.getItem(BREAK_KEY)) || 0; } catch { /* private mode */ }
+    if (last >= mark) return;
+
+    // A block that begins exactly on the mark has just announced itself; a
+    // break belongs in the middle of a session, not at its first second.
+    const running = runningAt(mark).filter(t => new Date(t.start).getTime() < mark);
+    if (!running.length) return;
+
+    try { localStorage.setItem(BREAK_KEY, String(mark)); } catch { /* private mode */ }
+
+    const markMin = at.getHours() * 60 + at.getMinutes();
+    notify(`Take a ${BREAK_MIN}-minute break`, {
+      body: `${running.map(t => t.title).join(', ')} — back at ${fmtTime(markMin + BREAK_MIN)}`,
+      tag: 'break',
+    });
+  }
+
   async function requestNotifications() {
     if (!('Notification' in window)) { toast('This browser does not support notifications.'); return; }
     await Notification.requestPermission();
@@ -944,6 +992,7 @@
     if (Notification.permission === 'granted') {
       toast('Notifications on — you’ll get a ping when each block starts.');
       checkReminders();
+      checkBreaks();
     } else {
       toast('Notifications blocked — enable them in site settings.');
     }
@@ -1147,14 +1196,15 @@
   renderAll();
   scrollToNow();
   checkReminders();
+  checkBreaks();
 
-  setInterval(checkReminders, TICK_MS);
+  setInterval(() => { checkReminders(); checkBreaks(); }, TICK_MS);
   setInterval(updateNow, 30000);
 
   // Background tabs get their timers throttled, so catch up the moment the tab
   // (or the OS) hands focus back rather than waiting for the next tick.
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { checkReminders(); updateNow(); }
+    if (!document.hidden) { checkReminders(); checkBreaks(); updateNow(); }
   });
 
   if ('serviceWorker' in navigator) {

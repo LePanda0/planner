@@ -103,7 +103,15 @@ Each card fires up to two notifications:
 2. **"Now: <title>"** the moment the block starts, showing its time range. It
    stays on screen until dismissed, and tapping it focuses Planner.
 
-Set a card's lead to `No notifications` (`-1`) to silence both.
+And while any block is running, a **break reminder** on every half hour of the
+clock — 5:00, 5:30, 6:00 — rather than counted from each block's own start, so
+back-to-back blocks keep one rhythm. A mark that falls exactly on a block's
+start is skipped (the start alert just fired), a mark more than 5 minutes past
+is dropped, and overlapping blocks share a single reminder. The last mark
+announced lives in `planner.break` so a reload cannot repeat it.
+
+Set a card's lead to `No notifications` (`-1`) to silence all three — such a
+card is not treated as a running session either.
 
 Nothing is scheduled on a server — the app checks every 20 seconds, and again
 whenever the tab regains focus, because background tabs get their timers
