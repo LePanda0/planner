@@ -72,7 +72,9 @@
    'timer-clock', 'timer-state', 'timer-custom', 'custom-min', 'timer-toggle',
    'timer-reset', 'preset-custom', 'focus-when', 'focus-total', 'focus-sub',
    'blocks-done', 'span-title', 'span-when', 'span-focus', 'span-blocks', 'span-sub',
-   'settings', 'swatches', 'footer', 'footer-toggle'
+   'settings', 'swatches', 'footer', 'footer-toggle',
+   'day-grade', 'day-grade-letter', 'span-grade', 'span-grade-letter',
+   'grades', 'grades-month', 'month-grid'
   ].forEach(id => { els[id] = document.getElementById(id); });
 
   // --------------------------------------------------------------- storage
@@ -1189,9 +1191,53 @@
     renderStats();
   }
 
+  /** Every block scheduled on a day, finished or not. */
+  function blocksOn(day) {
+    return state.tasks.filter(t => t.start && isSameDay(new Date(t.start), day));
+  }
+
   /** A finished block counts towards the day it was scheduled on. */
   function blocksDoneOn(day) {
-    return state.tasks.filter(t => t.done && t.start && isSameDay(new Date(t.start), day)).length;
+    return blocksOn(day).filter(t => t.done).length;
+  }
+
+  // --------------------------------------------------------------- grading
+
+  const GRADE_POINTS = { A: 4, B: 3, C: 2, D: 1 };
+  const LETTERS = [null, 'D', 'C', 'B', 'A'];
+
+  /**
+   * A day is judged only on blocks whose time is already over — an hour you
+   * have not reached yet is not a miss. Every one of them checked is an A;
+   * from there it slides to a D, which is the floor.
+   */
+  function gradeOn(day, now = Date.now()) {
+    const passed = blocksOn(day).filter(t =>
+      new Date(t.start).getTime() + t.durationMin * 60000 <= now);
+    if (!passed.length) return null;
+
+    const done = passed.filter(t => t.done).length;
+    const share = done / passed.length;
+    const letter = share === 1 ? 'A' : share >= 0.8 ? 'B' : share >= 0.6 ? 'C' : 'D';
+    return { letter, done, of: passed.length };
+  }
+
+  /** A stretch is graded as the mean of its days' grades, days under way included. */
+  function gradeOver(days, now = Date.now()) {
+    const today = startOfDay(new Date(now));
+    const marks = days
+      .filter(d => startOfDay(d) <= today)
+      .map(d => gradeOn(d, now))
+      .filter(Boolean);
+    if (!marks.length) return null;
+
+    const mean = marks.reduce((sum, m) => sum + GRADE_POINTS[m.letter], 0) / marks.length;
+    return { letter: LETTERS[Math.round(mean)], days: marks.length, mean };
+  }
+
+  function showGrade(el, grade) {
+    el.textContent = grade ? grade.letter : '–';
+    el.className = 'stat-value grade-letter ' + (grade ? 'g-' + grade.letter : 'g-none');
   }
 
   /**
@@ -1227,7 +1273,8 @@
     els['focus-when'].textContent = isToday ? 'today'
       : day.toLocaleDateString([], { month: 'short', day: 'numeric' });
     els['focus-total'].textContent = mins ? fmtDuration(mins) : '0m';
-    els['blocks-done'].textContent = String(blocks);
+    els['blocks-done'].textContent = `${blocks}/${blocksOn(day).length}`;
+    showGrade(els['day-grade-letter'], gradeOn(day));
     els['focus-sub'].textContent = entry.done
       ? `${entry.done} session${entry.done === 1 ? '' : 's'} finished`
       : mins ? 'No full session yet.'
@@ -1250,8 +1297,10 @@
 
     els['span-title'].textContent = weekend ? 'Weekend' : 'Weekdays';
     els['span-when'].textContent = `${label(days[0])} – ${label(days[days.length - 1])}`;
+    const created = days.reduce((n, d) => n + blocksOn(d).length, 0);
     els['span-focus'].textContent = mins ? fmtDuration(mins) : '0m';
-    els['span-blocks'].textContent = String(blocks);
+    els['span-blocks'].textContent = `${blocks}/${created}`;
+    showGrade(els['span-grade-letter'], gradeOver(days));
     els['span-sub'].textContent = sessions
       ? `${sessions} session${sessions === 1 ? '' : 's'} finished`
       : mins ? 'No full session yet.'
@@ -1332,11 +1381,44 @@
     try { localStorage.setItem(FOOTER_KEY, collapsed ? 'collapsed' : 'open'); } catch { /* private mode */ }
   }
 
+  /** A month of day cells, each showing what that day earned. */
+  function renderGrades() {
+    const month = view === 'week' ? new Date() : selectedDay;
+    const first = new Date(month.getFullYear(), month.getMonth(), 1);
+    const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+    const today = new Date();
+
+    els['grades-month'].textContent =
+      first.toLocaleDateString([], { month: 'long', year: 'numeric' });
+
+    const cells = [];
+    for (let i = 0; i < first.getDay(); i++) cells.push('<div class="day-cell is-blank"></div>');
+    for (let d = 1; d <= days; d++) {
+      const day = new Date(month.getFullYear(), month.getMonth(), d);
+      const grade = gradeOn(day);
+      const mark = grade ? grade.letter : '–';
+      const cls = grade ? 'g-' + grade.letter : 'g-none';
+      const label = grade ? `${grade.letter}, ${grade.done} of ${grade.of} finished` : 'no grade';
+      cells.push(
+        `<div class="day-cell${isSameDay(day, today) ? ' is-today' : ''}" title="${esc(label)}">` +
+        `<span class="dom">${d}</span><span class="mark ${cls}">${mark}</span></div>`);
+    }
+    els['month-grid'].innerHTML = cells.join('');
+  }
+
+  function openGrades() {
+    renderGrades();
+    els.grades.showModal();
+  }
+
   function openSettings() {
     els.settings.showModal();
   }
 
   function wireSettings() {
+    els['day-grade'].addEventListener('click', openGrades);
+    els['span-grade'].addEventListener('click', openGrades);
+    $('#grades-close').addEventListener('click', () => els.grades.close());
     $('#settings-btn').addEventListener('click', openSettings);
     $('#settings-close').addEventListener('click', () => els.settings.close());
     els.swatches.addEventListener('click', e => {

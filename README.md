@@ -102,6 +102,30 @@ stretch that day belongs to.
 - A block counts as completed on the day it is scheduled for, so the count is
   read straight off the tasks rather than stored separately.
 
+Blocks done reads `done/created`, where created counts every block scheduled
+for that day or stretch, finished or not.
+
+## Grades
+
+Each panel ends with a letter grade, and clicking one opens a month of grades
+laid out as a calendar.
+
+A day is judged only on blocks whose time is **already over** -- an hour you
+have not reached yet is not a miss, so a day with nothing passed earns no grade
+at all:
+
+| Share of passed blocks checked | Grade |
+| --- | --- |
+| all of them | A |
+| 80% or more | B |
+| 60% or more | C |
+| below that | D |
+
+D is the floor; there is no F. A stretch is graded as the **mean of its days'
+grades** (A=4 down to D=1, rounded, ties going up), counting only days that
+have started, rather than by pooling every card together -- so one heavy day
+cannot drown out four light ones.
+
 The bottom panel totals whichever stretch the selected day falls in:
 
 | Selected day | Stretch totalled |
@@ -131,7 +155,7 @@ tint it pairs with, drawn in whichever mode you are already in.
 ## Other features
 
 - Priority (colored left edge), notes, and per-task duration
-- A focus timer with presets, per-day stats, and weekday/weekend totals
+- A focus timer, per-day and weekday/weekend stats, and letter grades
 - A block shows its note under the time, or beside the title when it is
   too short (under ~55 min) for a second line
 - A notification when a block starts, plus an optional heads-up beforehand

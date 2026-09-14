@@ -176,6 +176,11 @@
           <div class="stat-value" id="blocks-done">0</div>
           <div class="stat-label">blocks done</div>
         </div>
+        <button class="stat stat-grade" id="day-grade" type="button" aria-haspopup="dialog"
+                title="See this month's grades">
+          <span class="stat-value grade-letter g-none" id="day-grade-letter">–</span>
+          <span class="stat-label">grade</span>
+        </button>
       </div>
       <p class="focus-sub" id="focus-sub">No sessions yet.</p>
     </section>
@@ -192,6 +197,11 @@
           <div class="stat-value" id="span-blocks">0</div>
           <div class="stat-label">blocks done</div>
         </div>
+        <button class="stat stat-grade" id="span-grade" type="button" aria-haspopup="dialog"
+                title="See this month's grades">
+          <span class="stat-value grade-letter g-none" id="span-grade-letter">–</span>
+          <span class="stat-label">grade</span>
+        </button>
       </div>
       <p class="focus-sub" id="span-sub">Nothing logged yet.</p>
     </section>
@@ -214,6 +224,27 @@
   </button>
   <input id="import-file" type="file" accept="application/json" hidden>
 </footer>
+
+<dialog id="grades" class="editor grades" aria-labelledby="grades-heading">
+  <div class="editor-form">
+    <h2 id="grades-heading">Grades <span class="stat-when" id="grades-month">—</span></h2>
+
+    <div class="month-head" aria-hidden="true">
+      <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+    </div>
+    <div class="month-grid" id="month-grid"></div>
+
+    <p class="setting-hint" id="grades-key">
+      A — every block that has passed is checked. B — 80% or more. C — 60% or more. D — below that.
+      A day with nothing finished yet earns no grade.
+    </p>
+
+    <div class="editor-actions">
+      <span class="spacer"></span>
+      <button type="button" id="grades-close" class="btn primary sm">Done</button>
+    </div>
+  </div>
+</dialog>
 
 <dialog id="settings" class="editor settings" aria-labelledby="settings-heading">
   <div class="editor-form">
