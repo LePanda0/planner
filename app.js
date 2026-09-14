@@ -17,6 +17,8 @@
   const DRAG_THRESHOLD = 4; // px before a press becomes a drag
   const EDGE = 48;          // px from the edge that triggers auto-scroll
   const TICK_MS = 20000;
+  // How late a block may be before its "starting now" alert is just noise.
+  const START_GRACE_MS = 10 * 60000;
 
   const HOUR_H = parseFloat(
     getComputedStyle(document.documentElement).getPropertyValue('--hour-h')
@@ -36,6 +38,8 @@
   /** @type {'day'|'week'} which span the calendar shows */
   let view = 'day';
   let showDone = false;
+  /** @type {ServiceWorkerRegistration|null} set once the SW registers */
+  let swReg = null;
 
   const els = {};
   ['tray', 'tray-list', 'tray-count', 'tray-empty', 'done-list', 'toggle-done',
@@ -65,7 +69,8 @@
       // A template is never itself on the grid — only its copies are.
       start: t.regular ? null : (t.start || null),
       done: !!t.done,
-      notified: !!t.notified,
+      notified: !!t.notified,   // the lead-time heads-up has fired
+      started: !!t.started,     // the "block is starting now" alert has fired
       created: t.created || new Date().toISOString(),
     };
   }
@@ -180,7 +185,7 @@
     const t = byId(id);
     if (!t) return;
     t.start = isoAt(day, clamp(minutes, 0, DAY_MIN - t.durationMin));
-    t.notified = false; // a moved task deserves a fresh reminder
+    t.notified = t.started = false; // a moved task deserves fresh alerts
     save();
     renderAll();
   }
@@ -202,6 +207,7 @@
       templateId: t.id,
       done: false,
       notified: false,
+      started: false,
       created: new Date().toISOString(),
       start: isoAt(day, at),
     }));
@@ -214,7 +220,7 @@
     const t = byId(id);
     if (!t) return;
     t.start = null;
-    t.notified = false;
+    t.notified = t.started = false;
     save();
     renderAll();
   }
@@ -241,8 +247,9 @@
 
     clampToMidnight(t);
 
-    // A new lead time deserves a fresh chance to fire.
+    // A new lead time — or a new start — deserves a fresh chance to fire.
     if (t.leadMin !== before.leadMin) t.notified = false;
+    if (t.start !== before.start) t.notified = t.started = false;
 
     if (t.regular) propagate(t, before);
 
@@ -283,7 +290,7 @@
     const t = byId(id);
     if (!t) return;
     t.done = !t.done;
-    if (t.done) t.notified = true;
+    if (t.done) t.notified = t.started = true; // finished early: stop pestering
     save();
     renderAll();
   }
@@ -864,27 +871,58 @@
 
   // ------------------------------------------------------------- reminders
 
+  /**
+   * Show a notification through the service worker when one is running, so it
+   * survives a backgrounded tab and can be clicked to focus Planner. Plain
+   * `new Notification` is the fallback for desktop browsers without the SW.
+   */
+  function notify(title, options) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const opts = { icon: './icon-192.png', badge: './icon-192.png', ...options };
+    try {
+      if (swReg && swReg.showNotification) {
+        swReg.showNotification(title, { data: { url: location.href }, ...opts })
+          .catch(err => console.warn('Notification failed:', err));
+        return;
+      }
+      new Notification(title, opts);
+    } catch (err) {
+      console.warn('Notification failed:', err);
+    }
+  }
+
   function checkReminders() {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     const now = Date.now();
     let changed = false;
 
     for (const t of state.tasks) {
-      if (t.done || t.notified || !t.start || t.leadMin < 0) continue;
-      const at = new Date(t.start).getTime() - t.leadMin * 60000;
-      if (at > now || now - at > 86400000) continue; // not yet, or too stale to bother
+      if (t.done || !t.start || t.leadMin < 0) continue; // -1 opts the card out entirely
+      const start = new Date(t.start).getTime();
+      const startMin = minutesInto(t.start);
+      const body = t.notes ? '\n' + t.notes : '';
 
-      try {
-        new Notification(t.title, {
-          body: `Starts ${fmtTime(minutesInto(t.start))}${t.notes ? '\n' + t.notes : ''}`,
-          tag: t.id,
-          icon: './icon-192.png',
+      // Heads-up, leadMin before the block. A lead of 0 has nothing to say
+      // that the start alert below won't say a moment later.
+      if (!t.notified && t.leadMin > 0 && start - t.leadMin * 60000 <= now && now < start) {
+        notify(t.title, {
+          body: `Starts ${fmtTime(startMin)}${body}`,
+          tag: `${t.id}:lead`,
         });
-      } catch (err) {
-        console.warn('Notification failed:', err);
+        t.notified = true;
+        changed = true;
       }
-      t.notified = true;
-      changed = true;
+
+      // The block itself beginning.
+      if (!t.started && start <= now && now - start <= START_GRACE_MS) {
+        notify(`Now: ${t.title}`, {
+          body: `${fmtTime(startMin)} – ${fmtTime(startMin + t.durationMin)}${body}`,
+          tag: `${t.id}:start`,
+          requireInteraction: true,
+        });
+        t.started = true;
+        changed = true;
+      }
     }
     if (changed) { save(); renderAll(); }
   }
@@ -894,10 +932,10 @@
     await Notification.requestPermission();
     updateNotifyButton();
     if (Notification.permission === 'granted') {
-      toast('Reminders on. They fire while Planner is open.');
+      toast('Notifications on — you’ll get a ping when each block starts.');
       checkReminders();
     } else {
-      toast('Reminders blocked — enable them in site settings.');
+      toast('Notifications blocked — enable them in site settings.');
     }
   }
 
@@ -905,7 +943,7 @@
     const btn = els['notify-btn'];
     if (!('Notification' in window)) { btn.hidden = true; return; }
     btn.hidden = Notification.permission === 'granted';
-    btn.textContent = Notification.permission === 'denied' ? 'Reminders blocked' : 'Enable reminders';
+    btn.textContent = Notification.permission === 'denied' ? 'Notifications blocked' : 'Enable notifications';
   }
 
   // ----------------------------------------------------------- theme & I/O
@@ -1103,9 +1141,15 @@
   setInterval(checkReminders, TICK_MS);
   setInterval(updateNow, 30000);
 
+  // Background tabs get their timers throttled, so catch up the moment the tab
+  // (or the OS) hands focus back rather than waiting for the next tick.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { checkReminders(); updateNow(); }
+  });
+
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW failed:', err));
-    });
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => { swReg = reg; })
+      .catch(err => console.warn('SW failed:', err));
   }
 })();

@@ -1,5 +1,5 @@
 /* Offline shell for Planner. Bump CACHE when assets change. */
-const CACHE = 'planner-v6';
+const CACHE = 'planner-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -24,6 +24,20 @@ self.addEventListener('activate', event => {
     caches.keys()
       .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
+  );
+});
+
+// Tapping a block notification focuses the open Planner, or opens one.
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || './', self.location).href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(wins => {
+      const open = wins.find(w => w.url.startsWith(self.registration.scope));
+      if (open && 'focus' in open) return open.focus();
+      return self.clients.openWindow(url);
+    })
   );
 });
 

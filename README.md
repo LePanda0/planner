@@ -87,20 +87,33 @@ tap never accidentally moves a card.
 ## Other features
 
 - Priority (colored left edge), notes, and per-task duration
-- Browser notifications at a configurable lead time before a block starts
+- A notification when a block starts, plus an optional heads-up beforehand
 - Installable as a PWA, works offline
 - Light and dark themes, following the system by default
 - Export/import all tasks as JSON
 
-## How reminders actually work
+## How notifications actually work
 
-Nothing is scheduled on a server — the app checks every 20 seconds for blocks
-whose reminder time has passed and fires a browser `Notification`.
+Each card fires up to two notifications:
 
-Reminders therefore arrive when Planner is **open in a tab**, or running as an
-installed PWA. If every window is closed, the reminder fires the next time you
-open the app (as long as it's less than a day late). This is the honest limit of
-static hosting.
+1. **A heads-up**, `leadMin` minutes before the block (skipped when the lead is
+   `0`, since the start alert lands moments later).
+2. **"Now: <title>"** the moment the block starts, showing its time range. It
+   stays on screen until dismissed, and tapping it focuses Planner.
+
+Set a card's lead to `No notifications` (`-1`) to silence both.
+
+Nothing is scheduled on a server — the app checks every 20 seconds, and again
+whenever the tab regains focus, because background tabs get their timers
+throttled. Notifications are shown through the service worker registration when
+one is available, which is what makes them survive a backgrounded tab on mobile
+and makes them clickable.
+
+Alerts therefore arrive when Planner is **open in a tab**, or running as an
+installed PWA. If every window is closed, the heads-up is missed and the start
+alert only fires if you reopen within 10 minutes of the block starting — a stale
+"this started 3 hours ago" buzz is worse than silence. This is the honest limit
+of static hosting.
 
 **To get true background push** you would need a small backend: a Web Push
 service (VAPID keys + a push subscription stored server-side) that wakes the
@@ -135,7 +148,7 @@ Pushing to `main` publishes automatically via GitHub Pages
 | --- | --- |
 | `index.html` | App shell: top bar, tray, calendar |
 | `styles.css` | Theming, layout, card/block/grid styling |
-| `app.js` | State, storage, drag controller, overlap layout, reminders |
+| `app.js` | State, storage, drag controller, overlap layout, notifications |
 | `sw.js` | Offline cache (stale-while-revalidate) |
 | `manifest.webmanifest` | PWA metadata |
 
@@ -151,8 +164,11 @@ Tasks are stored under `planner.v2` as:
   templateId,                   // the template this was copied from, or null
   start,                        // ISO datetime, or null when unscheduled
                                 // (always null for a regular card)
-  leadMin,                      // reminder lead time; -1 disables
-  done, notified, created
+  leadMin,                      // heads-up lead time; -1 silences the card
+  done,
+  notified,                     // the lead-time heads-up has fired
+  started,                      // the "starting now" alert has fired
+  created
 }
 ```
 
