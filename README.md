@@ -137,7 +137,7 @@ tint it pairs with, drawn in whichever mode you are already in.
 - A notification when a block starts, plus an optional heads-up beforehand
 - Installable as a PWA, works offline
 - Light and dark themes, following the system by default, in six colours
-- Export/import all tasks as JSON
+- Export/import all tasks as JSON, from a footer bar that folds away
 
 ## How notifications actually work
 

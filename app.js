@@ -10,6 +10,7 @@
   const LEGACY_KEY = 'planner.v1';
   const THEME_KEY = 'planner.theme';
   const ACCENT_KEY = 'planner.accent';
+  const FOOTER_KEY = 'planner.footer';
   const VIEW_KEY = 'planner.view';
   const BREAK_KEY = 'planner.break';  // the last break mark already announced
   const TIMER_KEY = 'planner.timer';
@@ -71,7 +72,7 @@
    'timer-clock', 'timer-state', 'timer-custom', 'custom-min', 'timer-toggle',
    'timer-reset', 'preset-custom', 'focus-when', 'focus-total', 'focus-sub',
    'blocks-done', 'span-title', 'span-when', 'span-focus', 'span-blocks', 'span-sub',
-   'settings', 'swatches'
+   'settings', 'swatches', 'footer', 'footer-toggle'
   ].forEach(id => { els[id] = document.getElementById(id); });
 
   // --------------------------------------------------------------- storage
@@ -1315,6 +1316,22 @@
     try { localStorage.setItem(ACCENT_KEY, name); } catch { /* private mode */ }
   }
 
+  /** Collapsed, the footer keeps only its handle — Export and the rest are one click away. */
+  function applyFooter(collapsed) {
+    els.footer.classList.toggle('is-collapsed', collapsed);
+    const btn = els['footer-toggle'];
+    btn.setAttribute('aria-expanded', String(!collapsed));
+    const label = collapsed ? 'Show the footer bar' : 'Hide the footer bar';
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+  }
+
+  function toggleFooter() {
+    const collapsed = !els.footer.classList.contains('is-collapsed');
+    applyFooter(collapsed);
+    try { localStorage.setItem(FOOTER_KEY, collapsed ? 'collapsed' : 'open'); } catch { /* private mode */ }
+  }
+
   function openSettings() {
     els.settings.showModal();
   }
@@ -1458,6 +1475,7 @@
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
 
+    els['footer-toggle'].addEventListener('click', toggleFooter);
     els['toggle-done'].addEventListener('click', () => { showDone = !showDone; renderTray(); });
     els['notify-btn'].addEventListener('click', requestNotifications);
     $('#theme-btn').addEventListener('click', toggleTheme);
@@ -1504,6 +1522,7 @@
 
   applyTheme(localStorage.getItem(THEME_KEY));
   applyAccent(localStorage.getItem(ACCENT_KEY));
+  applyFooter(localStorage.getItem(FOOTER_KEY) === 'collapsed');
   if (localStorage.getItem(VIEW_KEY) === 'week') view = 'week';
   load();
   loadTimer();
