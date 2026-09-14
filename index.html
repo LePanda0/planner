@@ -160,9 +160,34 @@
     </section>
 
     <section class="side-section focus">
-      <h2 class="section-label">Focus <span class="focus-when" id="focus-when">today</span></h2>
-      <div class="focus-total" id="focus-total">0m</div>
+      <h2 class="section-label">Focus <span class="stat-when" id="focus-when">today</span></h2>
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-value" id="focus-total">0m</div>
+          <div class="stat-label">focus time</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="blocks-done">0</div>
+          <div class="stat-label">blocks done</div>
+        </div>
+      </div>
       <p class="focus-sub" id="focus-sub">No sessions yet.</p>
+    </section>
+
+    <section class="side-section span-stats">
+      <h2 class="section-label"><span id="span-title">Weekdays</span>
+        <span class="stat-when" id="span-when">—</span></h2>
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-value" id="span-focus">0m</div>
+          <div class="stat-label">focus time</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="span-blocks">0</div>
+          <div class="stat-label">blocks done</div>
+        </div>
+      </div>
+      <p class="focus-sub" id="span-sub">Nothing logged yet.</p>
     </section>
   </aside>
 </main>

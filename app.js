@@ -68,7 +68,8 @@
    'editor', 'editor-form', 'regular-section', 'regular-list', 'regular-count',
    'calendar', 'week-head', 'today-col',
    'timer-clock', 'timer-state', 'timer-custom', 'custom-min', 'timer-toggle',
-   'timer-reset', 'preset-custom', 'focus-when', 'focus-total', 'focus-sub'
+   'timer-reset', 'preset-custom', 'focus-when', 'focus-total', 'focus-sub',
+   'blocks-done', 'span-title', 'span-when', 'span-focus', 'span-blocks', 'span-sub'
   ].forEach(id => { els[id] = document.getElementById(id); });
 
   // --------------------------------------------------------------- storage
@@ -354,7 +355,7 @@
     renderTray();
     renderCalendar();
     updateNow();
-    renderFocus();
+    renderStats();
   }
 
   function renderDayLabel() {
@@ -1182,8 +1183,31 @@
     }
     els['preset-custom'].classList.toggle('is-active', ![5, 10, 25, 50].includes(mins));
 
-    renderFocus();
+    renderStats();
   }
+
+  /** A finished block counts towards the day it was scheduled on. */
+  function blocksDoneOn(day) {
+    return state.tasks.filter(t => t.done && t.start && isSameDay(new Date(t.start), day)).length;
+  }
+
+  /**
+   * The stretch a range stat covers: the Monday-to-Friday of that week, or,
+   * from either half of a weekend, that Saturday and Sunday as one pair.
+   */
+  function statSpan(day) {
+    const d = startOfDay(day);
+    const dow = d.getDay();
+    if (dow === 6) return { weekend: true, days: [d, addDays(d, 1)] };
+    if (dow === 0) return { weekend: true, days: [addDays(d, -1), d] };
+    const monday = addDays(startOfWeek(d), 1);   // startOfWeek lands on Sunday
+    return { weekend: false, days: Array.from({ length: 5 }, (_, i) => addDays(monday, i)) };
+  }
+
+  /** Which day the side panel reports on — the calendar's, or today in week view. */
+  function statDay() { return view === 'week' ? new Date() : selectedDay; }
+
+  function renderStats() { renderFocus(); renderSpan(); }
 
   /**
    * The timer always logs to the real today, so that is what the counter shows
@@ -1191,18 +1215,44 @@
    * total is the honest answer.
    */
   function renderFocus() {
-    const day = view === 'week' ? new Date() : selectedDay;
+    const day = statDay();
     const isToday = isSameDay(day, new Date());
     const entry = focusOn(day);
     const mins = Math.floor(entry.sec / 60);
+    const blocks = blocksDoneOn(day);
 
     els['focus-when'].textContent = isToday ? 'today'
       : day.toLocaleDateString([], { month: 'short', day: 'numeric' });
     els['focus-total'].textContent = mins ? fmtDuration(mins) : '0m';
+    els['blocks-done'].textContent = String(blocks);
     els['focus-sub'].textContent = entry.done
       ? `${entry.done} session${entry.done === 1 ? '' : 's'} finished`
       : mins ? 'No full session yet.'
       : isToday ? 'No focus logged yet.' : 'Nothing logged.';
+  }
+
+  /** Weekday or weekend totals for the stretch the selected day belongs to. */
+  function renderSpan() {
+    const { weekend, days } = statSpan(statDay());
+    let sec = 0, blocks = 0, sessions = 0;
+    for (const d of days) {
+      const entry = focusOn(d);
+      sec += entry.sec;
+      sessions += entry.done;
+      blocks += blocksDoneOn(d);
+    }
+    const mins = Math.floor(sec / 60);
+    // Built by hand: some locales render {weekday, day} as "14 Mon".
+    const label = d => `${d.toLocaleDateString([], { weekday: 'short' })} ${d.getDate()}`;
+
+    els['span-title'].textContent = weekend ? 'Weekend' : 'Weekdays';
+    els['span-when'].textContent = `${label(days[0])} – ${label(days[days.length - 1])}`;
+    els['span-focus'].textContent = mins ? fmtDuration(mins) : '0m';
+    els['span-blocks'].textContent = String(blocks);
+    els['span-sub'].textContent = sessions
+      ? `${sessions} session${sessions === 1 ? '' : 's'} finished`
+      : mins ? 'No full session yet.'
+      : 'Nothing logged yet.';
   }
 
   function wireTimer() {

@@ -87,8 +87,9 @@ tap never accidentally moves a card.
 ## Timer and focus counter
 
 A right-hand panel holds a session timer with 5 / 10 / 25 / 50-minute presets
-and a custom length (1-600 minutes). Below it, a counter shows how much focus
-time the day has collected and how many sessions were finished.
+and a custom length (1-600 minutes). Below it, two stat blocks: the selected
+day's focus time and blocks completed, then the same pair totalled over the
+stretch that day belongs to.
 
 - `endsAt` is the only thing that says the clock is running; everything else is
   derived, so a reload resumes the session where it really is. Time that passed
@@ -98,11 +99,24 @@ time the day has collected and how many sessions were finished.
   shows that day's stored total. Totals live in `planner.focus`, keyed by local
   date and pruned past 60 days.
 - Finishing a session raises a notification and logs a completed session.
+- A block counts as completed on the day it is scheduled for, so the count is
+  read straight off the tasks rather than stored separately.
+
+The bottom panel totals whichever stretch the selected day falls in:
+
+| Selected day | Stretch totalled |
+| --- | --- |
+| Mon-Fri | that week's Monday through Friday |
+| Sat | that Saturday and the Sunday after |
+| Sun | that Sunday and the Saturday before |
+
+A weekend is counted as the Saturday-Sunday pair people mean by the word, which
+is deliberately not the app's Sunday-start calendar week.
 
 ## Other features
 
 - Priority (colored left edge), notes, and per-task duration
-- A focus timer with presets and a per-day focus counter
+- A focus timer with presets, per-day stats, and weekday/weekend totals
 - A block shows its note under the time, or beside the title when it is
   too short (under ~55 min) for a second line
 - A notification when a block starts, plus an optional heads-up beforehand
