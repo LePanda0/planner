@@ -327,12 +327,20 @@ body.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbin
   display: flex; align-items: start; gap: 6px;
   min-height: 16px;
 }
-.event .event-body { flex: 1; min-width: 0; }
+.event .event-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* The head normally dissolves so the title is just another row of the body;
+   on a tight block it becomes a row of its own and the note joins the title. */
+.event-head { display: contents; }
 .event-title {
   font-size: 12.5px; font-weight: 550; line-height: 1.25;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .event-time { font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; line-height: 1.3; }
+.event-note {
+  order: 3; /* below the time when it has room for a line of its own */
+  font-size: 11px; color: var(--text-dim); line-height: 1.3;
+  white-space: pre-wrap; overflow: hidden; word-wrap: break-word;
+}
 .event.is-done .event-title { text-decoration: line-through; color: var(--text-dim); }
 .event.is-done { opacity: .65; }
 .event .check { width: 15px; height: 15px; margin-top: 1px; }
@@ -340,9 +348,19 @@ body.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbin
 .event.is-short { padding-top: 1px; align-items: center; }
 .event.is-short .event-time { display: none; }
 
+/* Under ~55 minutes there is no second line to give the note, so it sits
+   beside the title, shrinking to one ellipsised line. */
+.event.is-tight .event-head { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.event.is-tight .event-title { flex: 0 1 auto; min-width: 0; }
+.event.is-tight .event-note {
+  order: 0; flex: 1 1 auto; min-width: 0;
+  white-space: nowrap; text-overflow: ellipsis;
+}
+
 /* too thin for anything but the title */
 .event.is-narrow { padding: 2px 3px 2px 5px; }
-.event.is-narrow .check, .event.is-narrow .del, .event.is-narrow .event-time { display: none; }
+.event.is-narrow .check, .event.is-narrow .del, .event.is-narrow .event-time,
+.event.is-narrow .event-note { display: none; }
 .event.is-narrow .event-title { font-size: 11.5px; }
 
 .resize-handle {
@@ -422,7 +440,7 @@ body.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbin
 /* ------------------------------ responsive ------------------------------ */
 /* A week column is ~1/7th as wide, so the block's time no longer fits. */
 @media (max-width: 1000px) {
-  .lanes.is-week .event-time { display: none; }
+  .lanes.is-week .event-time, .lanes.is-week .event-note { display: none; }
   .lanes.is-week .event { padding-left: 5px; padding-right: 4px; }
 }
 

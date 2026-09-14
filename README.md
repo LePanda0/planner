@@ -87,6 +87,8 @@ tap never accidentally moves a card.
 ## Other features
 
 - Priority (colored left edge), notes, and per-task duration
+- A block shows its note under the time, or beside the title when it is
+  too short (under ~55 min) for a second line
 - A notification when a block starts, plus an optional heads-up beforehand
 - Installable as a PWA, works offline
 - Light and dark themes, following the system by default

@@ -484,9 +484,15 @@
       // for a checkbox and a time range, so those step aside for the title.
       const narrow = laneW * (widthPct / 100) - gap * 2 < 96;
 
+      // A note wants a line of its own, but a block under ~55 minutes has none
+      // to spare once the title and time are in — there it rides beside the
+      // title instead of vanishing.
+      const tight = height < 52;
+
       const el = document.createElement('article');
       el.className = `event prio-${t.priority}${t.done ? ' is-done' : ''}` +
-        `${height < 34 ? ' is-short' : ''}${narrow ? ' is-narrow' : ''}`;
+        `${height < 34 ? ' is-short' : ''}${narrow ? ' is-narrow' : ''}` +
+        `${tight ? ' is-tight' : ''}`;
       el.dataset.id = t.id;
       el.tabIndex = 0;
       el.style.top = `${s * PX_PER_MIN}px`;
@@ -495,14 +501,18 @@
       el.style.width = `calc(${widthPct}% - ${gap * 2}px)`;
       el.setAttribute('aria-label',
         `${t.title}, ${fmtTime(s)} to ${fmtTime(s + t.durationMin)}` +
-        (view === 'week' ? `, ${day.toLocaleDateString([], { weekday: 'long' })}` : ''));
+        (view === 'week' ? `, ${day.toLocaleDateString([], { weekday: 'long' })}` : '') +
+        (t.notes ? `, ${t.notes}` : ''));
 
       el.innerHTML = `
         <button class="check" data-act="toggle" aria-label="Mark ${t.done ? 'not done' : 'done'}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </button>
         <div class="event-body">
-          <div class="event-title">${esc(t.title)}</div>
+          <div class="event-head">
+            <div class="event-title">${esc(t.title)}</div>
+            ${t.notes ? `<div class="event-note">${esc(t.notes)}</div>` : ''}
+          </div>
           <div class="event-time">${fmtTime(s)} – ${fmtTime(s + t.durationMin)}</div>
         </div>
         <button class="del" data-act="delete" aria-label="Delete task">
