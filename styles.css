@@ -495,9 +495,20 @@ body.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbin
 
 .footer-toggle { flex: none; color: var(--text-dim); }
 .footer-toggle svg { transition: transform .18s; }
-/* Collapsed the bar keeps only its handle, so it can always be opened again. */
-.footer.is-collapsed { padding-top: 2px; padding-bottom: 2px; }
+/* Collapsed the bar gives up its height entirely, so the panels and the grid
+   run to the bottom of the window. Its handle floats over the corner instead,
+   because a bar with nothing left to click could never be opened again. */
+.footer.is-collapsed {
+  height: 0; padding: 0; border-top: none; overflow: visible; position: relative;
+}
 .footer.is-collapsed .footer-body { display: none; }
+.footer.is-collapsed .footer-toggle {
+  position: absolute; right: 10px; bottom: 8px; z-index: 30; opacity: .5;
+  background: var(--surface); border-color: var(--border); box-shadow: var(--shadow);
+  transition: opacity .15s;
+}
+.footer.is-collapsed .footer-toggle:hover,
+.footer.is-collapsed .footer-toggle:focus-visible { opacity: 1; }
 .footer.is-collapsed .footer-toggle svg { transform: rotate(180deg); }
 
 /* -------------------------------- editor -------------------------------- */
