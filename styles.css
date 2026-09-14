@@ -503,7 +503,7 @@ body.is-dragging { user-select: none; -webkit-user-select: none; cursor: grabbin
 }
 .footer.is-collapsed .footer-body { display: none; }
 .footer.is-collapsed .footer-toggle {
-  position: absolute; right: 10px; bottom: 8px; z-index: 30; opacity: .5;
+  position: absolute; right: 16px; bottom: 8px; z-index: 30; opacity: .5;
   background: var(--surface); border-color: var(--border); box-shadow: var(--shadow);
   transition: opacity .15s;
 }

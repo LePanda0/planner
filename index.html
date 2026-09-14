@@ -199,11 +199,6 @@
 </main>
 
 <footer class="footer" id="footer">
-  <button id="footer-toggle" class="btn icon sm footer-toggle" type="button"
-          aria-expanded="true" aria-controls="footer-body" aria-label="Hide the footer bar" title="Hide the footer bar">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-  </button>
-
   <div class="footer-body" id="footer-body">
     <span>Saved locally in this browser.</span>
     <span class="hint">Click a card to edit · drag it onto the grid · drag its bottom edge to resize · drag it back to the tray to unschedule</span>
@@ -212,6 +207,11 @@
     <button id="import-btn" class="btn ghost sm" type="button">Import</button>
     <button id="clear-done" class="btn ghost sm" type="button">Clear done</button>
   </div>
+
+  <button id="footer-toggle" class="btn icon sm footer-toggle" type="button"
+          aria-expanded="true" aria-controls="footer-body" aria-label="Hide the footer bar" title="Hide the footer bar">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+  </button>
   <input id="import-file" type="file" accept="application/json" hidden>
 </footer>
 
