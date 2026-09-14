@@ -114,14 +114,15 @@ A day is judged only on blocks whose time is **already over** -- an hour you
 have not reached yet is not a miss, so a day with nothing passed earns no grade
 at all:
 
-| Share of passed blocks checked | Grade |
+| Passed blocks left unchecked | Grade |
 | --- | --- |
-| all of them | A |
-| 80% or more | B |
-| 60% or more | C |
-| below that | D |
+| none | A |
+| one | B |
+| two | C |
+| three or more | D |
 
-D is the floor; there is no F. A stretch is graded as the **mean of its days'
+It is one step per block missed, not a share: a single miss is a B whether the
+day held two blocks or twenty. D is the floor; there is no F. A stretch is graded as the **mean of its days'
 grades** (A=4 down to D=1, rounded, ties going up), counting only days that
 have started, rather than by pooling every card together -- so one heavy day
 cannot drown out four light ones.

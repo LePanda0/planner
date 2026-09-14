@@ -1205,21 +1205,23 @@
 
   const GRADE_POINTS = { A: 4, B: 3, C: 2, D: 1 };
   const LETTERS = [null, 'D', 'C', 'B', 'A'];
+  const LETTERS_BY_MISS = ['A', 'B', 'C', 'D'];
 
   /**
    * A day is judged only on blocks whose time is already over — an hour you
-   * have not reached yet is not a miss. Every one of them checked is an A;
-   * from there it slides to a D, which is the floor.
+   * have not reached yet is not a miss. All of them checked is an A, then one
+   * step down the letters for each one that is not: B, C, and D from three on.
    */
   function gradeOn(day, now = Date.now()) {
     const passed = blocksOn(day).filter(t =>
       new Date(t.start).getTime() + t.durationMin * 60000 <= now);
     if (!passed.length) return null;
 
+    // One step per block missed, not a percentage: a single miss is a B whether
+    // the day held two blocks or twenty. D is the floor.
     const done = passed.filter(t => t.done).length;
-    const share = done / passed.length;
-    const letter = share === 1 ? 'A' : share >= 0.8 ? 'B' : share >= 0.6 ? 'C' : 'D';
-    return { letter, done, of: passed.length };
+    const missed = passed.length - done;
+    return { letter: LETTERS_BY_MISS[Math.min(missed, 3)], done, of: passed.length, missed };
   }
 
   /** A stretch is graded as the mean of its days' grades, days under way included. */
@@ -1398,7 +1400,9 @@
       const grade = gradeOn(day);
       const mark = grade ? grade.letter : '–';
       const cls = grade ? 'g-' + grade.letter : 'g-none';
-      const label = grade ? `${grade.letter}, ${grade.done} of ${grade.of} finished` : 'no grade';
+      const label = grade
+        ? `${grade.letter} — ${grade.done} of ${grade.of} finished`
+        : 'no grade yet';
       cells.push(
         `<div class="day-cell${isSameDay(day, today) ? ' is-today' : ''}" title="${esc(label)}">` +
         `<span class="dom">${d}</span><span class="mark ${cls}">${mark}</span></div>`);
