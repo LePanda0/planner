@@ -36,6 +36,12 @@
       <button id="view-week" class="seg" type="button" aria-pressed="false">Week</button>
     </div>
     <button id="notify-btn" class="btn ghost sm" type="button">Enable notifications</button>
+    <button id="settings-btn" class="btn icon" type="button" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-1.8-.3 1.6 1.6 0 00-1 1.5v.2a2 2 0 11-4 0V21a1.6 1.6 0 00-1-1.5 1.6 1.6 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.6 1.6 0 00.3-1.8 1.6 1.6 0 00-1.5-1H3a2 2 0 110-4h.2a1.6 1.6 0 001.5-1 1.6 1.6 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.6 1.6 0 001.8.3H9a1.6 1.6 0 001-1.5V3a2 2 0 114 0v.2a1.6 1.6 0 001 1.5 1.6 1.6 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00-.3 1.8V9a1.6 1.6 0 001.5 1H21a2 2 0 110 4h-.2a1.6 1.6 0 00-1.5 1z"/>
+      </svg>
+    </button>
     <button id="theme-btn" class="btn icon" type="button" title="Toggle theme" aria-label="Toggle theme">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
     </button>
@@ -201,6 +207,54 @@
   <button id="clear-done" class="btn ghost sm" type="button">Clear done</button>
   <input id="import-file" type="file" accept="application/json" hidden>
 </footer>
+
+<dialog id="settings" class="editor settings" aria-labelledby="settings-heading">
+  <div class="editor-form">
+    <h2 id="settings-heading">Settings</h2>
+
+    <section class="setting-block">
+      <span class="setting-label">Theme colour</span>
+      <p class="setting-hint">Each circle shows the accent and its soft tint, as they look in the mode you are in.</p>
+      <div class="swatches" id="swatches" role="radiogroup" aria-label="Theme colour">
+          <button class="swatch" type="button" data-accent="indigo"
+                  role="radio" aria-checked="false" aria-label="Indigo" title="Indigo">
+            <span class="swatch-dot" aria-hidden="true"></span>
+            <span class="swatch-name">Indigo</span>
+          </button>
+          <button class="swatch" type="button" data-accent="teal"
+                  role="radio" aria-checked="false" aria-label="Teal" title="Teal">
+            <span class="swatch-dot" aria-hidden="true"></span>
+            <span class="swatch-name">Teal</span>
+          </button>
+          <button class="swatch" type="button" data-accent="amber"
+                  role="radio" aria-checked="false" aria-label="Amber" title="Amber">
+            <span class="swatch-dot" aria-hidden="true"></span>
+            <span class="swatch-name">Amber</span>
+          </button>
+          <button class="swatch" type="button" data-accent="rose"
+                  role="radio" aria-checked="false" aria-label="Rose" title="Rose">
+            <span class="swatch-dot" aria-hidden="true"></span>
+            <span class="swatch-name">Rose</span>
+          </button>
+          <button class="swatch" type="button" data-accent="violet"
+                  role="radio" aria-checked="false" aria-label="Violet" title="Violet">
+            <span class="swatch-dot" aria-hidden="true"></span>
+            <span class="swatch-name">Violet</span>
+          </button>
+          <button class="swatch" type="button" data-accent="slate"
+                  role="radio" aria-checked="false" aria-label="Slate" title="Slate">
+            <span class="swatch-dot" aria-hidden="true"></span>
+            <span class="swatch-name">Slate</span>
+          </button>
+      </div>
+    </section>
+
+    <div class="editor-actions">
+      <span class="spacer"></span>
+      <button type="button" id="settings-close" class="btn primary sm">Done</button>
+    </div>
+  </div>
+</dialog>
 
 <dialog id="editor" class="editor" aria-labelledby="editor-heading">
   <form id="editor-form" class="editor-form" autocomplete="off">

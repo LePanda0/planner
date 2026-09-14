@@ -9,6 +9,7 @@
   const STORE_KEY = 'planner.v2';
   const LEGACY_KEY = 'planner.v1';
   const THEME_KEY = 'planner.theme';
+  const ACCENT_KEY = 'planner.accent';
   const VIEW_KEY = 'planner.view';
   const BREAK_KEY = 'planner.break';  // the last break mark already announced
   const TIMER_KEY = 'planner.timer';
@@ -69,7 +70,8 @@
    'calendar', 'week-head', 'today-col',
    'timer-clock', 'timer-state', 'timer-custom', 'custom-min', 'timer-toggle',
    'timer-reset', 'preset-custom', 'focus-when', 'focus-total', 'focus-sub',
-   'blocks-done', 'span-title', 'span-when', 'span-focus', 'span-blocks', 'span-sub'
+   'blocks-done', 'span-title', 'span-when', 'span-focus', 'span-blocks', 'span-sub',
+   'settings', 'swatches'
   ].forEach(id => { els[id] = document.getElementById(id); });
 
   // --------------------------------------------------------------- storage
@@ -1294,12 +1296,45 @@
     else document.documentElement.removeAttribute('data-theme');
   }
 
+  const ACCENTS = ['indigo', 'teal', 'amber', 'rose', 'violet', 'slate'];
+
+  /** The palette only swaps --accent and --accent-soft; everything else is shared. */
+  function applyAccent(name) {
+    const accent = ACCENTS.includes(name) ? name : ACCENTS[0];
+    document.documentElement.setAttribute('data-accent', accent);
+    for (const btn of document.querySelectorAll('.swatch')) {
+      btn.setAttribute('aria-checked', String(btn.dataset.accent === accent));
+    }
+    // Keep the browser chrome in step with the palette.
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', getComputedStyle(document.documentElement).getPropertyValue('--accent').trim());
+  }
+
+  function setAccent(name) {
+    applyAccent(name);
+    try { localStorage.setItem(ACCENT_KEY, name); } catch { /* private mode */ }
+  }
+
+  function openSettings() {
+    els.settings.showModal();
+  }
+
+  function wireSettings() {
+    $('#settings-btn').addEventListener('click', openSettings);
+    $('#settings-close').addEventListener('click', () => els.settings.close());
+    els.swatches.addEventListener('click', e => {
+      const btn = e.target.closest('.swatch');
+      if (btn) setAccent(btn.dataset.accent);
+    });
+  }
+
   function toggleTheme() {
     const current = document.documentElement.getAttribute('data-theme')
       || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     const next = current === 'dark' ? 'light' : 'dark';
     applyTheme(next);
     localStorage.setItem(THEME_KEY, next);
+    applyAccent(document.documentElement.getAttribute('data-accent'));
   }
 
   function exportJSON() {
@@ -1468,6 +1503,7 @@
   // ------------------------------------------------------------------ init
 
   applyTheme(localStorage.getItem(THEME_KEY));
+  applyAccent(localStorage.getItem(ACCENT_KEY));
   if (localStorage.getItem(VIEW_KEY) === 'week') view = 'week';
   load();
   loadTimer();
@@ -1475,6 +1511,7 @@
   wire();
   wireEditor();
   wireTimer();
+  wireSettings();
   updateViewControls();
   updateNotifyButton();
   renderAll();

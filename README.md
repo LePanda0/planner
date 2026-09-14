@@ -113,6 +113,21 @@ The bottom panel totals whichever stretch the selected day falls in:
 A weekend is counted as the Saturday-Sunday pair people mean by the word, which
 is deliberately not the app's Sunday-start calendar week.
 
+## Settings
+
+The gear in the header opens a settings dialog. It currently holds one thing:
+the theme colour, as six circles split between a palette's accent and the soft
+tint it pairs with, drawn in whichever mode you are already in.
+
+- A palette swaps only `--accent` and `--accent-soft`; every other colour is
+  shared, so the whole app recolours from two values.
+- Stored in `planner.accent`; an unknown value falls back to Indigo.
+- The rules sit *below* the light/dark blocks in `styles.css` on purpose:
+  `:root[data-accent="x"]` and `:root[data-theme="dark"]` have the same
+  specificity, so source order is what decides.
+- Dark palettes bright enough to fail against white button text (everything
+  but Indigo) declare their own dark `--accent-text`.
+
 ## Other features
 
 - Priority (colored left edge), notes, and per-task duration
@@ -121,7 +136,7 @@ is deliberately not the app's Sunday-start calendar week.
   too short (under ~55 min) for a second line
 - A notification when a block starts, plus an optional heads-up beforehand
 - Installable as a PWA, works offline
-- Light and dark themes, following the system by default
+- Light and dark themes, following the system by default, in six colours
 - Export/import all tasks as JSON
 
 ## How notifications actually work
